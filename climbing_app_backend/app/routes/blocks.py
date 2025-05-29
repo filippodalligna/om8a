@@ -3,12 +3,13 @@ import uuid
 from flask import Blueprint, request, jsonify, current_app, send_from_directory
 from werkzeug.utils import secure_filename
 from flask_login import login_required, current_user
+from flask_babel import gettext as _ # Added
 from app import db
-from app.models.models import ClimbingBlock, User
+from app.models.models import ClimbingBlock, User, Tag, Comment # Added Tag and Comment
 
 # Define the blueprint
 # url_prefix is /blocks, so routes defined here will be /blocks/..., /blocks/uploads/...
-bp = Blueprint('blocks', __name__)
+bp = Blueprint('blocks', __name__) # This is blocks_bp. blocks_bp is registered with /blocks prefix.
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
@@ -71,16 +72,36 @@ def create_block():
 
 @bp.route('/', methods=['GET'])
 def get_blocks():
-    blocks = ClimbingBlock.query.all()
+    query = ClimbingBlock.query
+
+    # Tag filtering
+    tags_str = request.args.get('tags')
+    if tags_str:
+        tag_names = [name.strip().lower() for name in tags_str.split(',') if name.strip()]
+        if tag_names:
+            for tag_name in tag_names:
+                # This ensures the block has an associated tag with the given name.
+                # Chaining these acts as an AND condition.
+                query = query.filter(ClimbingBlock.tags.any(Tag.name == tag_name))
+    
+    # Add other filters here if needed, e.g., difficulty
+    # difficulty = request.args.get('difficulty')
+    # if difficulty:
+    #     query = query.filter(ClimbingBlock.difficulty == difficulty)
+
+    blocks = query.order_by(ClimbingBlock.created_at.desc()).all() # Example ordering
+    
     blocks_data = []
     for block in blocks:
+        block_tags_data = [{'id': tag.id, 'name': tag.name} for tag in block.tags]
         blocks_data.append({
             'id': block.id,
             'name': block.name,
             'difficulty': block.difficulty,
             'photo_url': f'/blocks/uploads/{block.photo_filename}' if block.photo_filename else None,
             'uploader_id': block.uploader_id,
-            'created_at': block.created_at.isoformat()
+            'created_at': block.created_at.isoformat(),
+            'tags': block_tags_data # Include tags in the response
         })
     return jsonify(blocks_data), 200
 
@@ -89,16 +110,19 @@ def get_block(block_id):
     block = ClimbingBlock.query.get_or_404(block_id)
     uploader = User.query.get(block.uploader_id) # Assuming User model has a simple query
     
+    block_tags_data = [{'id': tag.id, 'name': tag.name} for tag in block.tags]
+    
     block_data = {
         'id': block.id,
         'name': block.name,
         'difficulty': block.difficulty,
         'photo_filename': block.photo_filename,
-        'photo_url': f'/blocks/uploads/{block.photo_filename}' if block.photo_filename else None,
+        'photo_url': f'/blocks/uploads/{block.photo_filename}' if new_block.photo_filename else None, # Corrected to use block.photo_filename
         'highlight_data': block.highlight_data,
         'uploader_id': block.uploader_id,
         'uploader_username': uploader.username if uploader else 'Unknown',
-        'created_at': block.created_at.isoformat()
+        'created_at': block.created_at.isoformat(),
+        'tags': block_tags_data # Added tags information
     }
     return jsonify(block_data), 200
 
@@ -112,3 +136,139 @@ def serve_uploaded_file(filename):
 @bp.route('/ping_blocks_bp', methods=['GET']) # Renamed to avoid conflict if main /ping exists
 def ping():
     return jsonify({'message': 'Blocks blueprint is active'})
+
+# --- Tag association endpoints moved from tags.py ---
+
+@bp.route('/<int:block_id>/tags', methods=['POST'])
+@login_required
+def add_tag_to_block(block_id):
+    data = request.get_json()
+    if not data:
+        return jsonify({'message': _('Missing data')}), 400
+
+    tag_id = data.get('tag_id')
+    tag_name = data.get('tag_name') # Allow creating/using tag by name
+
+    if not tag_id and not tag_name:
+        return jsonify({'message': _('Missing tag_id or tag_name')}), 400
+    
+    block = ClimbingBlock.query.get_or_404(block_id)
+    # Optional: Check if current_user is authorized to tag this block (e.g., uploader)
+    # if block.uploader_id != current_user.id:
+    #     return jsonify({'message': _('Not authorized to tag this block')}), 403
+
+    tag_to_add = None
+    if tag_id:
+        tag_to_add = Tag.query.get(tag_id)
+        if not tag_to_add:
+            return jsonify({'message': _('Tag not found by id')}), 404
+    elif tag_name:
+        tag_name = tag_name.strip().lower()
+        if not tag_name: # Check for empty string after strip
+            return jsonify({'message': _('Tag name cannot be empty')}), 400
+        tag_to_add = Tag.query.filter_by(name=tag_name).first()
+        if not tag_to_add: # Create tag if it doesn't exist by name
+            tag_to_add = Tag(name=tag_name)
+            db.session.add(tag_to_add)
+            # db.session.commit() # Commit here if tag creation is atomic, or at the end. Block add will commit.
+
+    if not tag_to_add: # Should ideally not be reached if logic above is correct
+         return jsonify({'message': _('Tag could not be processed')}), 500
+
+
+    if tag_to_add in block.tags:
+        return jsonify({'message': _('Tag already associated with this block')}), 409
+
+    block.tags.append(tag_to_add)
+    db.session.commit() # Commit after appending and potentially adding new tag
+    
+    block_tags_data = [{'id': tag.id, 'name': tag.name} for tag in block.tags]
+    return jsonify({'message': _('Tag added to block'), 'tags': block_tags_data}), 200
+
+
+@bp.route('/<int:block_id>/tags/<int:tag_id>', methods=['DELETE'])
+@login_required
+def remove_tag_from_block(block_id, tag_id):
+    block = ClimbingBlock.query.get_or_404(block_id)
+    # Optional: Check if current_user is authorized (e.g., uploader or admin)
+    # if block.uploader_id != current_user.id: # Example authorization check
+    #     return jsonify({'message': _('Not authorized to modify this block')}), 403
+        
+    tag_to_remove = Tag.query.get(tag_id) # No need for _or_404, check existence below
+    if not tag_to_remove:
+        return jsonify({'message': _('Tag not found')}), 404
+
+    if tag_to_remove not in block.tags:
+        return jsonify({'message': _('Tag not associated with this block')}), 404 # Or 400 Bad Request
+
+    block.tags.remove(tag_to_remove)
+    db.session.commit()
+
+    return jsonify({'message': _('Tag removed from block')}), 200
+
+# --- Comment endpoints for a specific block ---
+
+@bp.route('/<int:block_id>/comments', methods=['POST'])
+@login_required
+def post_comment_on_block(block_id):
+    block = ClimbingBlock.query.get_or_404(block_id) # Ensures block exists
+    data = request.get_json()
+
+    if not data or not data.get('text') or not data.get('text').strip():
+        return jsonify({'error': _('Comment text is required and cannot be empty')}), 400
+
+    text = data.get('text').strip()
+    
+    comment = Comment(
+        text=text,
+        block_id=block.id, # Use block.id from the fetched block
+        user_id=current_user.id
+    )
+    db.session.add(comment)
+    db.session.commit()
+
+    # Fetch author username for serialization (or use comment.author.username)
+    # author = User.query.get(comment.user_id)
+
+    serialized_comment = {
+        'id': comment.id,
+        'text': comment.text,
+        'created_at': comment.created_at.isoformat() + 'Z', # ISO 8601 format with Z for UTC
+        'author_username': comment.author.username, # Accessing via backref
+        'block_id': comment.block_id,
+        'user_id': comment.user_id
+    }
+    return jsonify({'message': _('Comment posted successfully'), 'comment': serialized_comment}), 201
+
+@bp.route('/<int:block_id>/comments', methods=['GET'])
+def get_comments_for_block(block_id):
+    block = ClimbingBlock.query.get_or_404(block_id) # Ensures block exists
+
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int) # Default 10 comments per page
+
+    # Paginate comments for the specific block, ordered by most recent first
+    comments_pagination = Comment.query.filter_by(block_id=block.id)\
+                                   .order_by(Comment.created_at.desc())\
+                                   .paginate(page=page, per_page=per_page, error_out=False)
+    
+    comments_data = []
+    for c in comments_pagination.items:
+        # author = User.query.get(c.user_id) # Fetch author for username, or use backref
+        comments_data.append({
+            'id': c.id,
+            'text': c.text,
+            'created_at': c.created_at.isoformat() + 'Z', # ISO 8601 format with Z for UTC
+            'author_username': c.author.username, # Accessing via backref
+            'user_id': c.user_id # Include user_id for frontend logic if needed
+        })
+    
+    return jsonify({
+        'comments': comments_data,
+        'total_comments': comments_pagination.total,
+        'current_page': comments_pagination.page,
+        'total_pages': comments_pagination.pages,
+        'per_page': comments_pagination.per_page,
+        'has_next': comments_pagination.has_next,
+        'has_prev': comments_pagination.has_prev
+    }), 200

@@ -166,7 +166,9 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
 
 ### **GET `/blocks/`**
 
--   **Description:** Get a list of all climbing blocks.
+-   **Description:** Get a list of all climbing blocks. Can be filtered by tags.
+-   **Query Parameters (optional):**
+    -   `tags` (String): Comma-separated list of tag names. Blocks returned will be associated with ALL specified tags (e.g., `?tags=overhang,crimp`). Tag names are case-insensitive.
 -   **Request Body:** None
 -   **Success Response (200 OK):**
     ```json
@@ -177,7 +179,8 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
             "difficulty": "V5",
             "photo_url": "/blocks/uploads/unique_id.jpg",
             "uploader_id": 123,
-            "created_at": "2024-05-30T12:00:00.000000"
+            "created_at": "2024-05-30T12:00:00.000000",
+            "tags": [{"id": 1, "name": "overhang"}] 
         },
         {
             "id": 2,
@@ -185,10 +188,13 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
             "difficulty": "V3",
             "photo_url": null,
             "uploader_id": 124,
-            "created_at": "2024-05-30T12:05:00.000000"
+            "created_at": "2024-05-30T12:05:00.000000",
+            "tags": []
         }
     ]
     ```
+-   **Example Request with Tag Filter:**
+    `GET /blocks/?tags=overhang,crimp`
 
 ### **GET `/blocks/<int:block_id>`**
 
@@ -205,7 +211,11 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
         "highlight_data": "{\"holds\":[{\"x\":10,\"y\":20,\"color\":\"red\"}]}",
         "uploader_id": 123,
         "uploader_username": "newclimber",
-        "created_at": "2024-05-30T12:00:00.000000"
+        "created_at": "2024-05-30T12:00:00.000000",
+        "tags": [
+            {"id": 1, "name": "overhang"},
+            {"id": 3, "name": "crimp"}
+        ]
     }
     ```
 -   **Error Responses:**
@@ -222,6 +232,154 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
 -   **Description:** Serve an uploaded block photo.
 -   **Request Body:** None
 -   **Success Response:** Image file (e.g., `image/jpeg`, `image/png`).
+
+### **POST `/blocks/<int:block_id>/tags`**
+
+-   **Description:** Add a tag to a specific climbing block. Requires authentication. Tag names are normalized to lowercase. If `tag_name` is provided and the tag doesn't exist, it will be created.
+-   **Request Body:** JSON
+    -   `tag_id` (Integer, optional): ID of an existing tag.
+    -   `tag_name` (String, optional): Name of a tag (will be created if it doesn't exist).
+    *One of `tag_id` or `tag_name` must be provided.*
+-   **Example Request (by ID):**
+    ```json
+    {
+        "tag_id": 1 
+    }
+    ```
+-   **Example Request (by Name):**
+    ```json
+    {
+        "tag_name": "Crimp"
+    }
+    ```
+-   **Success Response (200 OK):**
+    ```json
+    {
+        "message": "Tag added to block",
+        "tags": [
+            {"id": 1, "name": "overhang"}, 
+            {"id": 2, "name": "crimp"} 
+        ]
+    }
+    ```
+-   **Error Responses:**
+    -   **400 Bad Request (Missing fields/Empty name):**
+        ```json
+        { "message": "Missing tag_id or tag_name" }
+        ```
+        ```json
+        { "message": "Tag name cannot be empty" }
+        ```
+    -   **404 Not Found (Block not found / Tag not found by ID):**
+        ```json
+        { "message": "Climbing block not found" } 
+        ```
+        ```json
+        { "message": "Tag not found by id" }
+        ```
+    -   **409 Conflict (Tag already associated):**
+        ```json
+        { "message": "Tag already associated with this block" }
+        ```
+    -   **401 Unauthorized (Not logged in).**
+
+### **DELETE `/blocks/<int:block_id>/tags/<int:tag_id>`**
+
+-   **Description:** Remove a tag from a specific climbing block. Requires authentication.
+-   **Request Body:** None
+-   **Success Response (200 OK):**
+    ```json
+    {
+        "message": "Tag removed from block"
+    }
+    ```
+-   **Error Responses:**
+    -   **404 Not Found (Block or Tag not found / Tag not associated):**
+        ```json
+        { "message": "Climbing block not found" }
+        ```
+        ```json
+        { "message": "Tag not found" }
+        ```
+        ```json
+        { "message": "Tag not associated with this block" }
+        ```
+    -   **401 Unauthorized (Not logged in).**
+
+### **POST `/blocks/<int:block_id>/comments`**
+
+-   **Description:** Add a new comment to a specific climbing block. Requires authentication.
+-   **Request Body:** JSON
+    -   `text` (String, required, not empty): The content of the comment.
+-   **Example Request:**
+    ```json
+    {
+        "text": "Great climb!"
+    }
+    ```
+-   **Success Response (201 Created):**
+    ```json
+    {
+        "message": "Comment posted successfully",
+        "comment": {
+            "id": 1,
+            "text": "Great climb!",
+            "created_at": "YYYY-MM-DDTHH:MM:SS.ffffffZ",
+            "author_username": "testuser",
+            "block_id": 123,
+            "user_id": 1 
+        }
+    }
+    ```
+-   **Error Responses:**
+    -   **400 Bad Request (Missing/Empty text):**
+        ```json
+        { "error": "Comment text is required and cannot be empty" }
+        ```
+    -   **404 Not Found (Block not found):**
+        ```json
+        { "error": "Climbing block not found" } 
+        ```
+    -   **401 Unauthorized (Not logged in).**
+
+### **GET `/blocks/<int:block_id>/comments`**
+
+-   **Description:** Get comments for a specific climbing block. Supports pagination.
+-   **Query Parameters (optional):**
+    -   `page` (Integer, default: 1): Page number for pagination.
+    -   `per_page` (Integer, default: 10): Number of comments per page.
+-   **Success Response (200 OK):**
+    ```json
+    {
+        "comments": [
+            {
+                "id": 2,
+                "text": "Nice route!",
+                "created_at": "YYYY-MM-DDTHH:MM:SS.ffffffZ",
+                "author_username": "anotheruser",
+                "user_id": 2
+            },
+            {
+                "id": 1,
+                "text": "Challenging but fun.",
+                "created_at": "YYYY-MM-DDTHH:MM:SS.ffffffZ",
+                "author_username": "testuser",
+                "user_id": 1
+            }
+        ],
+        "total_comments": 5,
+        "current_page": 1,
+        "total_pages": 1,
+        "per_page": 10,
+        "has_next": false,
+        "has_prev": false
+    }
+    ```
+-   **Error Responses:**
+    -   **404 Not Found (Block not found):**
+        ```json
+        { "error": "Climbing block not found" }
+        ```
 
 ## 4. User History (`/history`)
 
@@ -347,7 +505,229 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
         }
         ```
 
-## 5. Leaderboard (`/leaderboard`)
+## 5. Tag Management (`/tags`)
+
+### **POST `/tags/`**
+
+-   **Description:** Create a new tag. Tag names are normalized to lowercase. Requires authentication.
+-   **Request Body:** JSON
+    -   `name` (String, required): Name of the tag.
+-   **Example Request:**
+    ```json
+    {
+        "name": "Overhang"
+    }
+    ```
+-   **Success Response (201 Created):**
+    ```json
+    {
+        "message": "Tag created successfully",
+        "tag": {
+            "id": 1,
+            "name": "overhang" 
+        }
+    }
+    ```
+-   **Error Responses:**
+    -   **400 Bad Request (Missing/Empty name):**
+        ```json
+        { "message": "Tag name is required" } 
+        ```
+        ```json
+        { "message": "Tag name cannot be empty" }
+        ```
+    -   **409 Conflict (Tag already exists):**
+        ```json
+        { 
+            "message": "Tag already exists",
+            "tag": {
+                "id": 1, 
+                "name": "overhang"
+            }
+        }
+        ```
+    -   **401 Unauthorized (Not logged in).**
+
+### **GET `/tags/`**
+
+-   **Description:** Get a list of all available tags, ordered by name.
+-   **Request Body:** None
+-   **Success Response (200 OK):**
+    ```json
+    [
+        {"id": 1, "name": "crimp"},
+        {"id": 2, "name": "dynamic"},
+        {"id": 3, "name": "overhang"},
+        {"id": 4, "name": "slab"},
+        {"id": 5, "name": "sloper"}
+    ]
+    ```
+
+## 6. Comment Management (`/comments`)
+
+### **`PUT /comments/<int:comment_id>`**
+
+-   **Description:** Update an existing comment. Requires authentication. User must be the author of the comment.
+-   **Request Body:** JSON
+    -   `text` (String, required, not empty): The new text for the comment.
+-   **Example Request:**
+    ```json
+    {
+        "text": "This is the updated comment text."
+    }
+    ```
+-   **Success Response (200 OK):**
+    ```json
+    {
+        "message": "Comment updated successfully",
+        "comment": {
+            "id": 1,
+            "text": "This is the updated comment text.",
+            "created_at": "YYYY-MM-DDTHH:MM:SS.ffffffZ",
+            "author_username": "testuser",
+            "block_id": 123,
+            "user_id": 1 
+        }
+    }
+    ```
+-   **Error Responses:**
+    -   **400 Bad Request (Missing/Empty text):**
+        ```json
+        { "error": "Request body must be JSON" }
+        ```
+        ```json
+        { "error": "Comment text cannot be empty" }
+        ```
+    -   **403 Forbidden (Not author):**
+        ```json
+        { "error": "You are not authorized to edit this comment" }
+        ```
+    -   **404 Not Found (Comment not found):**
+        ```json
+        { "error": "Comment not found" }
+        ```
+    -   **401 Unauthorized (Not logged in).**
+
+### **`DELETE /comments/<int:comment_id>`**
+
+-   **Description:** Delete an existing comment. Requires authentication. User must be the author of the comment.
+-   **Request Body:** None
+-   **Success Response (200 OK or 204 No Content):**
+    ```json
+    {
+        "message": "Comment deleted successfully"
+    }
+    ```
+    *(Note: API might return 204 No Content for successful deletions)*
+-   **Error Responses:**
+    -   **403 Forbidden (Not author):**
+        ```json
+        { "error": "You are not authorized to delete this comment" }
+        ```
+    -   **404 Not Found (Comment not found):**
+        ```json
+        { "error": "Comment not found" }
+        ```
+    -   **401 Unauthorized (Not logged in).**
+
+## 7. User Relationships (`/users`)
+
+### **`POST /users/<int:user_id>/follow`**
+
+-   **Description:** Follow a user specified by `user_id`. Requires authentication.
+-   **Request Body:** None
+-   **Success Response (200 OK):**
+    ```json
+    {
+      "message": "You are now following <username>." 
+    }
+    ```
+    *(Note: `<username>` will be the actual username of the user being followed.)*
+-   **Error Responses:**
+    -   **400 Bad Request:**
+        ```json
+        { "error": "You cannot follow yourself." }
+        ```
+        ```json
+        { "message": "You are already following this user." }
+        ```
+    -   **404 Not Found (User to follow not found):**
+        ```json
+        { "error": "User not found" } 
+        ```
+    -   **401 Unauthorized (Not logged in).**
+
+### **`DELETE /users/<int:user_id>/follow`**
+
+-   **Description:** Unfollow a user specified by `user_id`. Requires authentication.
+-   **Request Body:** None
+-   **Success Response (200 OK):**
+    ```json
+    {
+      "message": "You have unfollowed <username>."
+    }
+    ```
+    *(Note: `<username>` will be the actual username of the user being unfollowed.)*
+-   **Error Responses:**
+    -   **400 Bad Request:**
+        ```json
+        { "message": "You are not following this user." }
+        ```
+    -   **404 Not Found (User to unfollow not found):**
+        ```json
+        { "error": "User not found" }
+        ```
+    -   **401 Unauthorized (Not logged in).**
+
+### **`GET /users/<int:user_id>/followers`**
+
+-   **Description:** Get a list of users who are following the user specified by `user_id`. Supports pagination.
+-   **Query Parameters (optional):**
+    -   `page` (Integer, default: 1): Page number for pagination.
+    -   `per_page` (Integer, default: 10): Number of followers per page.
+-   **Success Response (200 OK):**
+    ```json
+    {
+      "followers": [
+        {"id": 2, "username": "follower_one"},
+        {"id": 3, "username": "follower_two"}
+      ],
+      "total": 5,
+      "pages": 1,
+      "current_page": 1
+    }
+    ```
+-   **Error Responses:**
+    -   **404 Not Found (User not found):**
+        ```json
+        { "error": "User not found" }
+        ```
+
+### **`GET /users/<int:user_id>/following`**
+
+-   **Description:** Get a list of users whom the user specified by `user_id` is following. Supports pagination.
+-   **Query Parameters (optional):**
+    -   `page` (Integer, default: 1): Page number for pagination.
+    -   `per_page` (Integer, default: 10): Number of users being followed per page.
+-   **Success Response (200 OK):**
+    ```json
+    {
+      "following": [
+        {"id": 4, "username": "followed_one"},
+        {"id": 5, "username": "followed_two"}
+      ],
+      "total": 3,
+      "pages": 1,
+      "current_page": 1
+    }
+    ```
+-   **Error Responses:**
+    -   **404 Not Found (User not found):**
+        ```json
+        { "error": "User not found" }
+        ```
+
+## 8. Leaderboard (`/leaderboard`)
 
 ### **GET `/leaderboard/`**
 

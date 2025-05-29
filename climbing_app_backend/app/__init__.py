@@ -1,8 +1,9 @@
 import os
-from flask import Flask
+from flask import Flask, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager
+from flask_babel import Babel # Added
 from config import Config
 
 db = SQLAlchemy()
@@ -27,6 +28,15 @@ def create_app(config_class=Config, config_overrides=None):
     db.init_app(app)
     migrate.init_app(app, db)
     login_manager.init_app(app)
+
+    # Initialize Babel
+    babel = Babel(app)
+    app.config['LANGUAGES'] = ['it', 'en']
+    app.config['BABEL_DEFAULT_LOCALE'] = 'it'
+
+    @babel.localeselector
+    def get_locale():
+        return request.accept_languages.best_match(app.config['LANGUAGES'])
 
     # Ensure the instance folder exists
     try:
@@ -56,5 +66,14 @@ def create_app(config_class=Config, config_overrides=None):
 
     from app.routes.leaderboard import bp as leaderboard_bp
     app.register_blueprint(leaderboard_bp, url_prefix='/leaderboard')
+
+    from app.routes.tags import tags_bp # Changed from bp to tags_bp to match definition
+    app.register_blueprint(tags_bp) # url_prefix is defined in the blueprint itself
+
+    from app.routes.comments import comments_bp # Added
+    app.register_blueprint(comments_bp) # url_prefix is defined in the blueprint itself
+
+    from app.routes.users import users_bp # Added
+    app.register_blueprint(users_bp) # url_prefix is defined in the blueprint itself
 
     return app

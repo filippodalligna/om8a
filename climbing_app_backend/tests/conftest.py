@@ -96,3 +96,13 @@ def auth_client(client):
     # Make auth actions available to tests if they need to register/login other users
     client.auth = auth 
     return client # now the client has session cookies for an authenticated user
+
+@pytest.fixture
+def create_block(auth_client):
+    """Fixture to create a block using the API, returns the block's JSON response."""
+    def _create_block(name='Test Block for Comments', difficulty='V0'):
+        response = auth_client.post('/blocks/', data={'name': name, 'difficulty': difficulty})
+        # Ensure the response indicates success; adjust status code if your API differs
+        assert response.status_code == 201, f"Failed to create block: {response.json}"
+        return response.json['block'] # Assuming block details are under 'block' key
+    return _create_block

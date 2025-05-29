@@ -1,0 +1,42 @@
+# Italian translations for Climbing App.
+# Copyright (C) 2024 Climbing App Team
+# This file is distributed under the same license as the Climbing App package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2024.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Climbing App 0.1\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2024-05-30 10:00:00+0000\n" # Example date, should be updated by pybabel
+"PO-Revision-Date: 2024-05-30 10:00:00+0000\n" # Example date
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: Italian <LL@li.org>\n"
+"Language: it\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.12.1\n" # Example Babel version, should be updated by pybabel
+
+msgid "User registered successfully"
+msgstr "Utente registrato con successo"
+
+msgid "Login successful"
+msgstr "Accesso riuscito"
+
+msgid "Logout successful"
+msgstr "Disconnessione riuscita"
+
+msgid "Invalid credentials"
+msgstr "Credenziali non valide"
+
+msgid "Missing username, email, or password"
+msgstr "Nome utente, email o password mancanti"
+
+msgid "Username already exists"
+msgstr "Nome utente già esistente"
+
+msgid "Email already exists"
+msgstr "Email già esistente"
+
+msgid "Missing email/username or password"
+msgstr "Email/nome utente o password mancanti"
