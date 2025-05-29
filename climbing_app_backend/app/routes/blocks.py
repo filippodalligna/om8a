@@ -5,7 +5,9 @@ from werkzeug.utils import secure_filename
 from flask_login import login_required, current_user
 from flask_babel import gettext as _ # Added
 from app import db
-from app.models.models import ClimbingBlock, User, Tag, Comment # Added Tag and Comment
+from app.models.models import ClimbingBlock, User, Tag, Comment 
+from app.services.badge_service import award_badge, BADGE_FIRST_COMMENT, BADGE_BLOCK_UPLOADER
+from app.services.notification_service import send_notification # Added
 
 # Define the blueprint
 # url_prefix is /blocks, so routes defined here will be /blocks/..., /blocks/uploads/...
@@ -60,16 +62,40 @@ def create_block():
 
     block_data = {
         'id': new_block.id,
-        'uuid': new_block.uuid, # Added UUID
+        'uuid': new_block.uuid, 
         'name': new_block.name,
         'difficulty': new_block.difficulty,
         'photo_filename': new_block.photo_filename,
         'photo_url': f'/blocks/uploads/{new_block.photo_filename}' if new_block.photo_filename else None,
         'highlight_data': new_block.highlight_data,
         'uploader_id': new_block.uploader_id,
-        'uploader_username': current_user.username, # Added uploader_username as per instructions
+        'uploader_username': current_user.username, 
         'created_at': new_block.created_at.isoformat()
     }
+    
+    # Award "Route Setter" badge if it's the user's first block with a photo
+    if new_block.photo_filename: # Check if photo was actually uploaded
+        if ClimbingBlock.query.filter_by(uploader_id=current_user.id).filter(ClimbingBlock.photo_filename.isnot(None)).count() == 1:
+            award_badge(current_user.id, BADGE_BLOCK_UPLOADER)
+    
+    # Notify followers about the new block
+    try:
+        uploader = current_user # User who uploaded the block
+        # uploader.followers is a dynamic query because of lazy='dynamic'
+        for follower in uploader.followers: # Iterating directly should work for dynamic queries
+            if follower.id != uploader.id: # Don't notify self (though not expected in followers)
+                payload = {
+                    "title": _("New Block Alert!"),
+                    "body": _("%(uploader_name)s just added a new block: %(block_name)s", 
+                              uploader_name=uploader.username, 
+                              block_name=new_block.name),
+                    "url": f"/blocks/{new_block.id}" # Example URL
+                }
+                send_notification(follower, payload)
+    except Exception as e:
+        # Log error, but don't let notification failure break the main operation
+        print(f"Error trying to send new block notification to followers of user {uploader.id}: {e}")
+            
     return jsonify({'message': 'Climbing block created successfully', 'block': block_data}), 201
 
 @bp.route('/', methods=['GET'])
@@ -242,6 +268,11 @@ def post_comment_on_block(block_id):
         'block_id': comment.block_id,
         'user_id': comment.user_id
     }
+
+    # Award "Commentator" badge if it's the user's first comment
+    if Comment.query.filter_by(user_id=current_user.id).count() == 1:
+        award_badge(current_user.id, BADGE_FIRST_COMMENT)
+        
     return jsonify({'message': _('Comment posted successfully'), 'comment': serialized_comment}), 201
 
 @bp.route('/<int:block_id>/comments', methods=['GET'])

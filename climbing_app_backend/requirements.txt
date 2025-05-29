@@ -6,3 +6,4 @@ Flask-Login
 pytest
 pytest-flask
 Flask-Babel
+pywebpush

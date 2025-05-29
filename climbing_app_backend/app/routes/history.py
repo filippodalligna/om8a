@@ -1,7 +1,8 @@
 from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
 from app import db
-from app.models.models import UserAttempt, User, ClimbingBlock
+from app.models.models import UserAttempt, User, ClimbingBlock # UserAttempt is already here
+from app.services.badge_service import award_badge, BADGE_FIRST_COMPLETED_CLIMB # Added
 
 # Define the blueprint
 bp = Blueprint('history', __name__, url_prefix='/history') # url_prefix is defined here
@@ -59,6 +60,12 @@ def log_attempt():
             'difficulty': block.difficulty
         }
     }
+
+    # Award "First Summit" badge if it's the user's first completed climb
+    if new_attempt.status == 'completed':
+        if UserAttempt.query.filter_by(user_id=current_user.id, status='completed').count() == 1:
+            award_badge(current_user.id, BADGE_FIRST_COMPLETED_CLIMB)
+            
     return jsonify({'message': 'Attempt logged successfully', 'attempt': attempt_data}), 201
 
 @bp.route('/me', methods=['GET'])

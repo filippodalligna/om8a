@@ -118,6 +118,30 @@ class UserBadge(db.Model):
     def __repr__(self):
         return f'<UserBadge User {self.user_id} earned Badge {self.badge_id} at {self.earned_at}>'
 
+class Badge(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    icon_url = db.Column(db.String(255), nullable=True)
+    criteria = db.Column(db.Text, nullable=True) # Textual or JSON criteria
+
+    def __repr__(self):
+        return f'<Badge {self.name}>'
+
+class UserBadge(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    badge_id = db.Column(db.Integer, db.ForeignKey('badge.id'), nullable=False)
+    earned_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    user = db.relationship('User', backref=db.backref('earned_badges_assoc', lazy='dynamic'))
+    badge = db.relationship('Badge', backref=db.backref('earned_by_users_assoc', lazy='dynamic'))
+
+    __table_args__ = (db.UniqueConstraint('user_id', 'badge_id', name='uq_user_badge'),)
+
+    def __repr__(self):
+        return f'<UserBadge User {self.user_id} earned Badge {self.badge_id} at {self.earned_at}>'
+
 class PushSubscription(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)

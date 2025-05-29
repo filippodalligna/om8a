@@ -10,3 +10,8 @@ class Config:
                                      # For instance folder, it's usually app.instance_path
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     UPLOAD_FOLDER = 'uploads' # Will be joined with app.instance_path
+
+    # VAPID keys for Push Notifications (Worker: Using placeholders)
+    VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY') or "YOUR_GENERATED_PRIVATE_KEY_PLACEHOLDER"
+    VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY') or "YOUR_GENERATED_PUBLIC_KEY_PLACEHOLDER"
+    VAPID_CLAIMS = {"sub": "mailto:admin@example.com"} # Replace with your admin email

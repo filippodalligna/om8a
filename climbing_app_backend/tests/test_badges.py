@@ -1,6 +1,8 @@
 # tests/test_badges.py
 import pytest
-from app.models.models import Badge, UserBadge, User, db # Adjust import
+import io # Added
+from app.models.models import Badge, UserBadge, User, db, Comment, UserAttempt, ClimbingBlock # Added models
+from app.services.badge_service import PREDEFINED_BADGES, BADGE_FIRST_COMMENT, BADGE_FIRST_COMPLETED_CLIMB, BADGE_BLOCK_UPLOADER # Added
 from datetime import datetime
 
 # Helper fixture to create a badge directly in the DB for testing purposes
@@ -104,3 +106,102 @@ def test_list_user_earned_badges_none(client, user1_fixture, app): # Added app t
 def test_list_badges_for_nonexistent_user(client):
     response = client.get('/badges/users/99999/badges') # User 99999 does not exist
     assert response.status_code == 404 # Assuming User.query.get_or_404(user_id) is used in the endpoint
+
+
+# --- Tests for awarding badges ---
+
+def test_award_badge_first_comment(auth_client, user1_fixture, create_block, app):
+    block_json = create_block() # Create a block to comment on
+    block_id = block_json['id']
+
+    # Ensure user does not have the badge yet
+    with app.app_context():
+        badge_def = Badge.query.filter_by(name=PREDEFINED_BADGES[BADGE_FIRST_COMMENT]["name"]).first()
+        if badge_def: # Badge might not exist if this is the first time it's being awarded
+            assert UserBadge.query.filter_by(user_id=user1_fixture.id, badge_id=badge_def.id).first() is None
+    
+    # Post the first comment
+    auth_client.post(f'/blocks/{block_id}/comments', json={'text': 'My first comment!'})
+
+    # Verify badge is awarded
+    with app.app_context():
+        # _ensure_badge_exists would have created it if it wasn't there
+        badge_def = Badge.query.filter_by(name=PREDEFINED_BADGES[BADGE_FIRST_COMMENT]["name"]).first()
+        assert badge_def is not None, "Badge definition should have been created"
+        
+        user_badge = UserBadge.query.filter_by(user_id=user1_fixture.id, badge_id=badge_def.id).first()
+        assert user_badge is not None
+        assert user_badge.badge.name == PREDEFINED_BADGES[BADGE_FIRST_COMMENT]["name"]
+
+    # Post a second comment - badge should not be awarded again
+    auth_client.post(f'/blocks/{block_id}/comments', json={'text': 'My second comment!'})
+    with app.app_context():
+        user_badges_count = UserBadge.query.filter_by(user_id=user1_fixture.id, badge_id=badge_def.id).count()
+        assert user_badges_count == 1
+
+
+def test_award_badge_first_completed_climb(auth_client, user1_fixture, create_block, app):
+    block_json = create_block()
+    block_id = block_json['id']
+
+    # Record a 'tried' attempt first (should not award)
+    auth_client.post('/history/attempts', json={
+        'block_id': block_id, 'status': 'tried', 'personal_notes': 'Almost got it'
+    })
+    with app.app_context():
+        badge_def = Badge.query.filter_by(name=PREDEFINED_BADGES[BADGE_FIRST_COMPLETED_CLIMB]["name"]).first()
+        if badge_def:
+            assert UserBadge.query.filter_by(user_id=user1_fixture.id, badge_id=badge_def.id).first() is None
+
+    # Record the first 'completed' attempt
+    auth_client.post('/history/attempts', json={
+        'block_id': block_id, 'status': 'completed', 'personal_notes': 'Sent it!'
+    })
+    with app.app_context():
+        badge_def = Badge.query.filter_by(name=PREDEFINED_BADGES[BADGE_FIRST_COMPLETED_CLIMB]["name"]).first()
+        assert badge_def is not None
+        user_badge = UserBadge.query.filter_by(user_id=user1_fixture.id, badge_id=badge_def.id).first()
+        assert user_badge is not None
+        assert user_badge.badge.name == PREDEFINED_BADGES[BADGE_FIRST_COMPLETED_CLIMB]["name"]
+    
+    # Record another 'completed' attempt - badge should not be awarded again
+    block2_json = create_block(name="Second Block")
+    auth_client.post('/history/attempts', json={
+        'block_id': block2_json['id'], 'status': 'completed', 'personal_notes': 'Another one!'
+    })
+    with app.app_context():
+        user_badges_count = UserBadge.query.filter_by(user_id=user1_fixture.id, badge_id=badge_def.id).count()
+        assert user_badges_count == 1
+
+
+def test_award_badge_block_uploader_with_photo(auth_client, user1_fixture, app):
+    # Upload a block with a photo
+    data = {'name': 'Photo Block 1', 'difficulty': 'V1', 'photo': (io.BytesIO(b"fakeimage"), 'test.jpg')}
+    auth_client.post('/blocks/', data=data, content_type='multipart/form-data')
+
+    with app.app_context():
+        badge_def = Badge.query.filter_by(name=PREDEFINED_BADGES[BADGE_BLOCK_UPLOADER]["name"]).first()
+        assert badge_def is not None
+        user_badge = UserBadge.query.filter_by(user_id=user1_fixture.id, badge_id=badge_def.id).first()
+        assert user_badge is not None
+        assert user_badge.badge.name == PREDEFINED_BADGES[BADGE_BLOCK_UPLOADER]["name"]
+
+    # Upload another block with a photo - badge should not be awarded again
+    data2 = {'name': 'Photo Block 2', 'difficulty': 'V2', 'photo': (io.BytesIO(b"anotherimage"), 'test2.jpg')}
+    auth_client.post('/blocks/', data=data2, content_type='multipart/form-data')
+    with app.app_context():
+        user_badges_count = UserBadge.query.filter_by(user_id=user1_fixture.id, badge_id=badge_def.id).count()
+        assert user_badges_count == 1
+
+
+def test_badge_block_uploader_no_photo(auth_client, user1_fixture, app):
+    # Upload a block without a photo
+    auth_client.post('/blocks/', data={'name': 'NoPhoto Block', 'difficulty': 'V0'})
+    
+    with app.app_context():
+        # Badge definition might be created by _ensure_badge_exists if any other test triggered it,
+        # but it should not be awarded to this user.
+        badge_def = Badge.query.filter_by(name=PREDEFINED_BADGES[BADGE_BLOCK_UPLOADER]["name"]).first()
+        if badge_def: # Only check UserBadge if Badge definition exists
+            user_badge = UserBadge.query.filter_by(user_id=user1_fixture.id, badge_id=badge_def.id).first()
+            assert user_badge is None # Should NOT be awarded

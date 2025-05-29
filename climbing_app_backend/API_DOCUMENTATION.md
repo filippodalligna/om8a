@@ -118,7 +118,9 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
 
 ### **POST `/blocks/`**
 
--   **Description:** Create a new climbing block. Requires authentication.
+-   **Description:** Create a new climbing block. Requires authentication. 
+    - Successfully creating a new block with a photo may result in awarding the 'Route Setter' badge to the uploader if it's their first block uploaded with a photo (potentially triggering a badge earned notification).
+    - Additionally, if the uploader has followers who are subscribed to notifications, they may receive a push notification about this new block.
 -   **Request:** `multipart/form-data`
     -   `name` (String, required): Name of the climbing block.
     -   `difficulty` (String, required): Difficulty rating (e.g., "V3", "5.10a").
@@ -313,7 +315,7 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
 
 ### **POST `/blocks/<int:block_id>/comments`**
 
--   **Description:** Add a new comment to a specific climbing block. Requires authentication.
+-   **Description:** Add a new comment to a specific climbing block. Requires authentication. Successfully posting a comment may result in awarding the 'Commentator' badge if it's the user's first comment.
 -   **Request Body:** JSON
     -   `text` (String, required, not empty): The content of the comment.
 -   **Example Request:**
@@ -422,7 +424,7 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
 
 ### **POST `/history/attempts`**
 
--   **Description:** Record an attempt on a climbing block. Requires authentication.
+-   **Description:** Record an attempt on a climbing block. Requires authentication. Successfully recording a 'completed' attempt may result in awarding the 'First Summit' badge if it's the user's first completed climb.
 -   **Request Body:** JSON
     -   `block_id` (Integer, required): ID of the climbing block.
     -   `status` (String, required): 'tried' or 'completed'.
@@ -765,6 +767,8 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
         ```
 
 ## 8. Badge System (`/badges`)
+
+*(Note: Earning a badge, as a side-effect of certain actions like posting a first comment, completing a first climb, or uploading a first block with a photo, may trigger a push notification to the user if they are subscribed to notifications.)*
 
 ### **`GET /badges/`**
 
