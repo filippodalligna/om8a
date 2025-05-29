@@ -1,3 +1,5 @@
+import uuid # Added
+import uuid # Added
 from datetime import datetime
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -11,6 +13,7 @@ class User(db.Model, UserMixin):
     climber_blocks = db.relationship('ClimbingBlock', backref='uploader', lazy=True)
     attempts = db.relationship('UserAttempt', backref='user', lazy=True)
     comments = db.relationship('Comment', backref='author', lazy='dynamic')
+    push_subscriptions = db.relationship('PushSubscription', backref='user', lazy='dynamic') # Added
 
     # 'followed' relationship: users that this user is following
     followed = db.relationship(
@@ -52,6 +55,7 @@ class Tag(db.Model):
 
 class ClimbingBlock(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    uuid = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()), index=True) # Added
     name = db.Column(db.String(100), nullable=False)
     difficulty = db.Column(db.String(50), nullable=False)
     photo_filename = db.Column(db.String(200), nullable=True)
@@ -61,7 +65,7 @@ class ClimbingBlock(db.Model):
     attempts = db.relationship('UserAttempt', backref='block', lazy=True)
     tags = db.relationship('Tag', secondary=block_tags, lazy='subquery',
                            backref=db.backref('blocks', lazy=True))
-    comments = db.relationship('Comment', backref='commented_block', lazy='dynamic') # Added
+    comments = db.relationship('Comment', backref='commented_block', lazy='dynamic')
 
     def __repr__(self):
         return f'<ClimbingBlock {self.name}>'
@@ -89,3 +93,38 @@ class Comment(db.Model):
 
     def __repr__(self):
         return f'<Comment {self.id} by User {self.user_id} on Block {self.block_id}>'
+
+class Badge(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    icon_url = db.Column(db.String(255), nullable=True)
+    criteria = db.Column(db.Text, nullable=True) # Textual or JSON criteria
+
+    def __repr__(self):
+        return f'<Badge {self.name}>'
+
+class UserBadge(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    badge_id = db.Column(db.Integer, db.ForeignKey('badge.id'), nullable=False)
+    earned_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    user = db.relationship('User', backref=db.backref('earned_badges_assoc', lazy='dynamic'))
+    badge = db.relationship('Badge', backref=db.backref('earned_by_users_assoc', lazy='dynamic'))
+
+    __table_args__ = (db.UniqueConstraint('user_id', 'badge_id', name='uq_user_badge'),)
+
+    def __repr__(self):
+        return f'<UserBadge User {self.user_id} earned Badge {self.badge_id} at {self.earned_at}>'
+
+class PushSubscription(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    subscription_json = db.Column(db.Text, nullable=False) # Stores the JSON string
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    # user relationship is defined by the backref in User model
+
+    def __repr__(self):
+        return f'<PushSubscription {self.id} for User {self.user_id}>'

@@ -76,4 +76,10 @@ def create_app(config_class=Config, config_overrides=None):
     from app.routes.users import users_bp # Added
     app.register_blueprint(users_bp) # url_prefix is defined in the blueprint itself
 
+    from app.routes.badges import badges_bp # Added
+    app.register_blueprint(badges_bp) # url_prefix is defined in the blueprint itself
+
+    from app.routes.notifications import notifications_bp # Added
+    app.register_blueprint(notifications_bp) # url_prefix is defined in the blueprint itself
+
     return app

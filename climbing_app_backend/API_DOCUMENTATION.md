@@ -139,12 +139,14 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
         "message": "Climbing block created successfully",
         "block": {
             "id": 1,
+            "uuid": "a1b2c3d4-e5f6-7890-1234-567890abcdef", 
             "name": "My Awesome Block",
             "difficulty": "V5",
             "photo_filename": "unique_id.jpg",
             "photo_url": "/blocks/uploads/unique_id.jpg",
             "highlight_data": "{\"holds\":[{\"x\":10,\"y\":20,\"color\":\"red\"}]}",
             "uploader_id": 123,
+            "uploader_username": "newclimber", 
             "created_at": "2024-05-30T12:00:00.000000"
         }
     }
@@ -175,6 +177,7 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
     [
         {
             "id": 1,
+            "uuid": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
             "name": "My Awesome Block",
             "difficulty": "V5",
             "photo_url": "/blocks/uploads/unique_id.jpg",
@@ -184,6 +187,7 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
         },
         {
             "id": 2,
+            "uuid": "b2c3d4e5-f6g7-8901-2345-67890abcdef1",
             "name": "Another Block",
             "difficulty": "V3",
             "photo_url": null,
@@ -204,6 +208,7 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
     ```json
     {
         "id": 1,
+        "uuid": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
         "name": "My Awesome Block",
         "difficulty": "V5",
         "photo_filename": "unique_id.jpg",
@@ -379,6 +384,38 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
     -   **404 Not Found (Block not found):**
         ```json
         { "error": "Climbing block not found" }
+        ```
+
+### **GET `/blocks/qr/<uuid_string>`**
+
+-   **Description:** Get details of a specific climbing block by its UUID. Useful for QR code scans.
+-   **Path Parameter:** 
+    -   `uuid_string` (String, required): The UUID (v4) of the block.
+-   **Request Body:** None
+-   **Success Response (200 OK):**
+    ```json
+    {
+        "id": 1,
+        "uuid": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+        "name": "Block Name from QR",
+        "difficulty": "V5",
+        "photo_filename": "unique_id.jpg",
+        "photo_url": "/blocks/uploads/unique_id.jpg",
+        "highlight_data": "{\"holds\":[]}",
+        "uploader_id": 123,
+        "uploader_username": "testuser",
+        "created_at": "2024-05-30T12:00:00.000000",
+        "tags": [{"id": 1, "name": "overhang"}]
+    }
+    ```
+-   **Error Responses:**
+    -   **400 Bad Request (Invalid UUID format):**
+        ```json
+        { "error": "Invalid UUID format" }
+        ```
+    -   **404 Not Found (Block not found):**
+        ```json
+        { "error": "Block not found with this QR code UUID" } 
         ```
 
 ## 4. User History (`/history`)
@@ -727,7 +764,117 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
         { "error": "User not found" }
         ```
 
-## 8. Leaderboard (`/leaderboard`)
+## 8. Badge System (`/badges`)
+
+### **`GET /badges/`**
+
+-   **Description:** Get a list of all available badges/achievements.
+-   **Request Body:** None
+-   **Success Response (200 OK):**
+    ```json
+    [
+      {
+        "id": 1,
+        "name": "FirstClimbMaster",
+        "description": "Awarded for completing your very first climb.",
+        "icon_url": "/static/badges/first_climb.png",
+        "criteria": "Complete any climb."
+      },
+      {
+        "id": 2,
+        "name": "V5Conqueror",
+        "description": "Awarded for completing a V5 difficulty climb.",
+        "icon_url": "/static/badges/v5_conqueror.png",
+        "criteria": "Complete one V5 climb."
+      }
+    ]
+    ```
+
+### **`GET /badges/users/<int:user_id>/badges`**
+
+-   **Description:** Get a list of badges earned by a specific user.
+-   **Path Parameter:** `user_id` (Integer, required).
+-   **Request Body:** None
+-   **Success Response (200 OK):**
+    ```json
+    [
+      {
+        "badge_id": 1,
+        "name": "FirstClimbMaster",
+        "description": "Awarded for completing your very first climb.",
+        "icon_url": "/static/badges/first_climb.png",
+        "earned_at": "YYYY-MM-DDTHH:MM:SS.ffffffZ"
+      }
+    ]
+    ```
+-   **Error Responses:**
+    -   **404 Not Found (User not found):**
+        ```json
+        { "error": "User not found" }
+        ```
+
+## 9. Push Notification Subscriptions (`/notifications`)
+
+### **`POST /notifications/subscribe`**
+
+-   **Description:** Subscribe to receive push notifications. Requires authentication. The request body should be the `PushSubscription` object obtained from the browser's Push API.
+-   **Request Body:** JSON (PushSubscription object)
+    ```json
+    {
+      "endpoint": "https://updates.push.services.mozilla.com/push/v2/...",
+      "expirationTime": null,
+      "keys": {
+        "p256dh": "B...",
+        "auth": "A..."
+      }
+    }
+    ```
+-   **Success Response (201 Created or 200 OK):**
+    ```json
+    {
+      "message": "Successfully subscribed to push notifications." 
+    } 
+    ```
+    or
+    ```json
+    {
+      "message": "Subscription already exists."
+    }
+    ```
+-   **Error Responses:**
+    -   **400 Bad Request (Invalid payload / Missing endpoint):**
+        ```json
+        { "error": "Invalid subscription data. Endpoint is required." }
+        ```
+    -   **401 Unauthorized (Not logged in).**
+
+### **`POST /notifications/unsubscribe`**
+
+-   **Description:** Unsubscribe from push notifications. Requires authentication. The request body should identify the subscription to remove by its endpoint URL.
+-   **Request Body:** JSON
+    ```json
+    {
+      "endpoint": "https://updates.push.services.mozilla.com/push/v2/..."
+    }
+    ```
+-   **Success Response (200 OK):**
+    ```json
+    {
+      "message": "Successfully unsubscribed from push notifications."
+    }
+    ```
+-   **Error Responses:**
+    -   **400 Bad Request (Endpoint missing):**
+        ```json
+        { "error": "Subscription endpoint is required." }
+        ```
+    -   **404 Not Found (Subscription not found):**
+        ```json
+        { "error": "Subscription not found." }
+        ```
+    -   **401 Unauthorized (Not logged in).**
+
+## 10. Leaderboard (`/leaderboard`)
 
 ### **GET `/leaderboard/`**
 

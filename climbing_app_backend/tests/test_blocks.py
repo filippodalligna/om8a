@@ -1,7 +1,8 @@
 # tests/test_blocks.py
 import io
-import pytest # Added for potential fixture use, though not strictly needed for these examples
-from app.models.models import Tag, ClimbingBlock, db, Comment # Added Comment
+import uuid # Added for QR tests
+import pytest 
+from app.models.models import Tag, ClimbingBlock, db, Comment 
 
 def test_create_block_without_photo(auth_client):
     response = auth_client.post('/blocks/', data={
@@ -294,3 +295,33 @@ def test_get_comments_for_block_pagination(auth_client, client, create_block):
     assert response_page2.json['current_page'] == 2
     assert response_page2.json['total_pages'] == 2
     assert response_page2.json['comments'][0]['text'] == 'Page Comment 1' # Oldest
+
+# --- Tests for QR Code UUID lookup ---
+
+def test_get_block_by_qr_uuid_valid(auth_client, create_block):
+    # create_block fixture (from conftest) calls POST /blocks/
+    # The POST /blocks/ response was updated in Step 1 to include 'uuid'
+    created_block_json = create_block(name='QR Block Test UUID', difficulty='V0')
+    assert 'uuid' in created_block_json, "UUID missing from create_block response"
+    block_uuid = created_block_json['uuid']
+    
+    response = auth_client.get(f'/blocks/qr/{block_uuid}')
+    assert response.status_code == 200
+    assert response.json['id'] == created_block_json['id']
+    assert response.json['name'] == 'QR Block Test UUID'
+    assert response.json['uuid'] == block_uuid
+
+def test_get_block_by_qr_uuid_invalid_format(auth_client):
+    invalid_uuid_string = "this-is-not-a-uuid"
+    response = auth_client.get(f'/blocks/qr/{invalid_uuid_string}')
+    assert response.status_code == 400
+    # Assuming error message key is 'Invalid UUID format' and it's translated
+    # My API returns {'error': _('Invalid UUID format')}
+    assert 'Invalid UUID format' in response.json['error'] 
+
+def test_get_block_by_qr_uuid_non_existent(auth_client):
+    non_existent_uuid = str(uuid.uuid4()) # Generate a valid but non-existent UUID
+    response = auth_client.get(f'/blocks/qr/{non_existent_uuid}')
+    assert response.status_code == 404
+    # My API returns {'error': _('Block not found with this QR code UUID')}
+    assert 'Block not found with this QR code UUID' in response.json['error']

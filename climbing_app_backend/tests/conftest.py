@@ -106,3 +106,30 @@ def create_block(auth_client):
         assert response.status_code == 201, f"Failed to create block: {response.json}"
         return response.json['block'] # Assuming block details are under 'block' key
     return _create_block
+
+@pytest.fixture(scope='function')
+def user1_fixture(app, auth_client): # Added app fixture to ensure context
+    # auth_client is already logged in as a user (typically user_id=1, email='default@example.com')
+    # Return the User object for this user
+    with app.app_context(): # Use the app fixture for context
+        from app.models.models import User # Import here to avoid circular dependency issues
+        user = User.query.filter_by(email='default@example.com').first()
+        if not user:
+            # Fallback if the default user from auth_client isn't found by that email
+            # This might happen if auth_client's details change or it's the very first user (ID 1)
+            user = User.query.get(1) 
+        if not user:
+            # If still not found, it's an issue with the auth_client setup or test DB state
+            pytest.skip("Default user for auth_client (default@example.com or ID 1) not found. Check conftest.py's auth_client setup.")
+        return user
+
+# Helper functions for creating/logging in test users, moved from test_users.py
+def create_test_user(client, username, email, password='password'):
+    """Helper to register a new user via API for testing."""
+    return client.post('/auth/register', json={
+        'username': username, 'email': email, 'password': password
+    })
+
+def login_test_user(client, email, password='password'):
+    """Helper to log in a user via API for testing."""
+    return client.post('/auth/login', json={'email': email, 'password': password})

@@ -60,12 +60,14 @@ def create_block():
 
     block_data = {
         'id': new_block.id,
+        'uuid': new_block.uuid, # Added UUID
         'name': new_block.name,
         'difficulty': new_block.difficulty,
         'photo_filename': new_block.photo_filename,
         'photo_url': f'/blocks/uploads/{new_block.photo_filename}' if new_block.photo_filename else None,
         'highlight_data': new_block.highlight_data,
         'uploader_id': new_block.uploader_id,
+        'uploader_username': current_user.username, # Added uploader_username as per instructions
         'created_at': new_block.created_at.isoformat()
     }
     return jsonify({'message': 'Climbing block created successfully', 'block': block_data}), 201
@@ -96,12 +98,13 @@ def get_blocks():
         block_tags_data = [{'id': tag.id, 'name': tag.name} for tag in block.tags]
         blocks_data.append({
             'id': block.id,
+            'uuid': block.uuid, # Added UUID here too for consistency
             'name': block.name,
             'difficulty': block.difficulty,
             'photo_url': f'/blocks/uploads/{block.photo_filename}' if block.photo_filename else None,
             'uploader_id': block.uploader_id,
             'created_at': block.created_at.isoformat(),
-            'tags': block_tags_data # Include tags in the response
+            'tags': block_tags_data
         })
     return jsonify(blocks_data), 200
 
@@ -114,15 +117,16 @@ def get_block(block_id):
     
     block_data = {
         'id': block.id,
+        'uuid': block.uuid, # Added/Ensured UUID
         'name': block.name,
         'difficulty': block.difficulty,
         'photo_filename': block.photo_filename,
-        'photo_url': f'/blocks/uploads/{block.photo_filename}' if new_block.photo_filename else None, # Corrected to use block.photo_filename
+        'photo_url': f'/blocks/uploads/{block.photo_filename}' if block.photo_filename else None, # Corrected variable
         'highlight_data': block.highlight_data,
         'uploader_id': block.uploader_id,
         'uploader_username': uploader.username if uploader else 'Unknown',
         'created_at': block.created_at.isoformat(),
-        'tags': block_tags_data # Added tags information
+        'tags': block_tags_data
     }
     return jsonify(block_data), 200
 
@@ -272,3 +276,40 @@ def get_comments_for_block(block_id):
         'has_next': comments_pagination.has_next,
         'has_prev': comments_pagination.has_prev
     }), 200
+
+@bp.route('/qr/<uuid_string>', methods=['GET'])
+def get_block_by_qr_uuid(uuid_string):
+    try:
+        # Validate if uuid_string is a valid UUID format before querying
+        # This doesn't check version, but ensures it's a valid UUID structure
+        val_uuid = uuid.UUID(uuid_string, version=4) # Specify version 4 for validation
+    except ValueError:
+        return jsonify({'error': _('Invalid UUID format')}), 400
+
+    # Query by the string representation of the UUID
+    block = ClimbingBlock.query.filter_by(uuid=uuid_string).first() # Use .first() and check if None
+    
+    if not block:
+        return jsonify({'error': _('Block not found with this QR code UUID')}), 404
+
+    # Serialize block data (similar to get_block(block_id))
+    uploader = User.query.get(block.uploader_id)
+    block_tags_data = [{'id': tag.id, 'name': tag.name} for tag in block.tags]
+    
+    # Consider if comments should be included or be a separate sub-resource call
+    # For now, let's keep it similar to get_block without comments for brevity in this response
+    
+    block_data = {
+        'id': block.id,
+        'uuid': block.uuid,
+        'name': block.name,
+        'difficulty': block.difficulty,
+        'photo_url': f"/blocks/uploads/{block.photo_filename}" if block.photo_filename else None,
+        'highlight_data': block.highlight_data,
+        'uploader_id': block.uploader_id,
+        'uploader_username': uploader.username if uploader else 'Unknown',
+        'created_at': block.created_at.isoformat(),
+        'tags': block_tags_data
+        # Comments could be paginated and fetched via /blocks/<id>/comments
+    }
+    return jsonify(block_data), 200
