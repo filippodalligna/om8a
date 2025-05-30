@@ -7,7 +7,7 @@ from flask_babel import gettext as _ # Added
 from app import db
 from app.models.models import ClimbingBlock, User, Tag, Comment 
 from app.services.badge_service import award_badge, BADGE_FIRST_COMMENT, BADGE_BLOCK_UPLOADER
-from app.services.notification_service import send_notification # Added
+from app.services.notification_service import send_notification, NOTIFICATION_TYPE_NEW_BLOCK_BY_FOLLOWED, NOTIFICATION_TYPE_COMMENT_ON_OWN_BLOCK # Updated import
 
 # Define the blueprint
 # url_prefix is /blocks, so routes defined here will be /blocks/..., /blocks/uploads/...
@@ -91,7 +91,7 @@ def create_block():
                               block_name=new_block.name),
                     "url": f"/blocks/{new_block.id}" # Example URL
                 }
-                send_notification(follower, payload)
+                send_notification(follower, payload, NOTIFICATION_TYPE_NEW_BLOCK_BY_FOLLOWED) # Updated call
     except Exception as e:
         # Log error, but don't let notification failure break the main operation
         print(f"Error trying to send new block notification to followers of user {uploader.id}: {e}")
@@ -272,6 +272,23 @@ def post_comment_on_block(block_id):
     # Award "Commentator" badge if it's the user's first comment
     if Comment.query.filter_by(user_id=current_user.id).count() == 1:
         award_badge(current_user.id, BADGE_FIRST_COMMENT)
+
+    # Notify block owner about the new comment (if they are not the commenter)
+    try:
+        if block.uploader_id != current_user.id:
+            block_owner = User.query.get(block.uploader_id)
+            if block_owner: # Should always be true
+                payload = {
+                    "title": _("New Comment on Your Block"),
+                    "body": _("%(commenter_name)s commented on your block '%(block_name)s': %(comment_text)s",
+                              commenter_name=current_user.username,
+                              block_name=block.name, # Use block.name (fetched block object)
+                              comment_text=comment.text[:50] + "..." if len(comment.text) > 50 else comment.text),
+                    "url": f"/blocks/{block.id}/comments" # Link to the block's comments
+                }
+                send_notification(block_owner, payload, NOTIFICATION_TYPE_COMMENT_ON_OWN_BLOCK)
+    except Exception as e:
+        print(f"Error sending new comment notification for block {block.id}: {e}")
         
     return jsonify({'message': _('Comment posted successfully'), 'comment': serialized_comment}), 201
 

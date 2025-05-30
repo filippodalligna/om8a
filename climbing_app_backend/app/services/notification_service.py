@@ -3,17 +3,38 @@ import json
 from pywebpush import webpush, WebPushException
 from flask import current_app
 from app import db # Assuming db is initialized in app.__init__
-from app.models.models import PushSubscription # User model not strictly needed here
-from flask_babel import gettext as _ # For constructing notification payloads
+from app.models.models import PushSubscription, User # User model is needed for preferences
+from flask_babel import gettext as _
 
-def send_notification(user, payload_dict):
+# Notification Type Constants
+NOTIFICATION_TYPE_BADGE_EARNED = "badge_earned"
+NOTIFICATION_TYPE_NEW_BLOCK_BY_FOLLOWED = "new_block_by_followed"
+NOTIFICATION_TYPE_COMMENT_ON_OWN_BLOCK = "comment_on_own_block"
+
+def send_notification(user, payload_dict, notification_type_key): # New signature
     """
-    Sends a push notification to all registered PUSH subscriptions for the given user.
+    Sends a push notification to all registered PUSH subscriptions for the given user,
+    respecting user's notification preferences.
     payload_dict should be like {"title": "...", "body": "...", "url": "/"}
+    notification_type_key is a string constant defining the type of notification.
     """
+    # Check user preference for this type of notification first
+    if notification_type_key == NOTIFICATION_TYPE_BADGE_EARNED and not user.notify_on_badge_earned:
+        print(f"User {user.id} has disabled notifications for badge earned.")
+        return
+    if notification_type_key == NOTIFICATION_TYPE_NEW_BLOCK_BY_FOLLOWED and not user.notify_on_new_block_by_followed:
+        print(f"User {user.id} has disabled notifications for new blocks by followed users.")
+        return
+    if notification_type_key == NOTIFICATION_TYPE_COMMENT_ON_OWN_BLOCK and not user.notify_on_comment_on_own_block:
+        print(f"User {user.id} has disabled notifications for comments on their own blocks.")
+        return
+
     # user.push_subscriptions is the backref from PushSubscription.user
-    if not user.push_subscriptions: 
-        return # No subscriptions for this user
+    # Check if there are any active subscriptions
+    active_subscriptions = [sub for sub in user.push_subscriptions] # Evaluate the dynamic query
+    if not active_subscriptions:
+        print(f"No active push subscriptions found for user {user.id}.")
+        return 
 
     vapid_private_key = current_app.config.get('VAPID_PRIVATE_KEY')
     vapid_claims = current_app.config.get('VAPID_CLAIMS')
@@ -21,13 +42,12 @@ def send_notification(user, payload_dict):
     if not vapid_private_key or "YOUR_GENERATED_PRIVATE_KEY_PLACEHOLDER" in vapid_private_key:
         print("VAPID private key not configured or is a placeholder. Cannot send push notifications.")
         return
-    if not vapid_claims:
+    if not vapid_claims: # VAPID_CLAIMS can be just a string (mailto) or a dict
         print("VAPID claims not configured. Cannot send push notifications.")
         return
 
-
     # Iterate over a copy of the subscriptions list in case of deletion
-    for sub_record in list(user.push_subscriptions):
+    for sub_record in active_subscriptions: # Use the evaluated list
         try:
             subscription_info = json.loads(sub_record.subscription_json)
             payload_json = json.dumps(payload_dict)

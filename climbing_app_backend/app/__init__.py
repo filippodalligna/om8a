@@ -82,4 +82,7 @@ def create_app(config_class=Config, config_overrides=None):
     from app.routes.notifications import notifications_bp # Added
     app.register_blueprint(notifications_bp) # url_prefix is defined in the blueprint itself
 
+    from app.routes.admin import admin_bp # Added
+    app.register_blueprint(admin_bp) # url_prefix is defined in the blueprint itself (/admin)
+
     return app

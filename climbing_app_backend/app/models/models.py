@@ -20,9 +20,15 @@ class User(db.Model, UserMixin):
         'User', secondary='user_follows', # Use string name of the table
         primaryjoin=lambda: (User.id == user_follows.c.follower_id),
         secondaryjoin=lambda: (User.id == user_follows.c.followed_id),
-        backref=db.backref('followers', lazy='dynamic'), # 'followers' are users following this user
+        backref=db.backref('followers', lazy='dynamic'), 
         lazy='dynamic'
     )
+    is_admin = db.Column(db.Boolean, nullable=False, default=False) # Added
+
+    # Notification Preferences
+    notify_on_comment_on_own_block = db.Column(db.Boolean, nullable=False, default=True)
+    notify_on_badge_earned = db.Column(db.Boolean, nullable=False, default=True)
+    notify_on_new_block_by_followed = db.Column(db.Boolean, nullable=False, default=True)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -66,6 +72,7 @@ class ClimbingBlock(db.Model):
     tags = db.relationship('Tag', secondary=block_tags, lazy='subquery',
                            backref=db.backref('blocks', lazy=True))
     comments = db.relationship('Comment', backref='commented_block', lazy='dynamic')
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow) # Added
 
     def __repr__(self):
         return f'<ClimbingBlock {self.name}>'

@@ -315,7 +315,8 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
 
 ### **POST `/blocks/<int:block_id>/comments`**
 
--   **Description:** Add a new comment to a specific climbing block. Requires authentication. Successfully posting a comment may result in awarding the 'Commentator' badge if it's the user's first comment.
+-   **Description:** Add a new comment to a specific climbing block. Requires authentication. 
+    - Successfully posting a comment may result in awarding the 'Commentator' badge if it's the user's first comment (potentially triggering a badge earned notification).
 -   **Request Body:** JSON
     -   `text` (String, required, not empty): The content of the comment.
 -   **Example Request:**
@@ -424,7 +425,8 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
 
 ### **POST `/history/attempts`**
 
--   **Description:** Record an attempt on a climbing block. Requires authentication. Successfully recording a 'completed' attempt may result in awarding the 'First Summit' badge if it's the user's first completed climb.
+-   **Description:** Record an attempt on a climbing block. Requires authentication. 
+    - Successfully recording a 'completed' attempt may result in awarding badges such as 'First Summit' (for the user's first completed climb), 'V3 Master' (for completing 3 unique V3 climbs), or 'Weekly Sender' (for completing 3 unique climbs in the last 7 days), if criteria are met. This may also trigger push notifications for earned badges.
 -   **Request Body:** JSON
     -   `block_id` (Integer, required): ID of the climbing block.
     -   `status` (String, required): 'tried' or 'completed'.
@@ -878,7 +880,81 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
         ```
     -   **401 Unauthorized (Not logged in).**
 
-## 10. Leaderboard (`/leaderboard`)
+## 10. Admin (`/admin`)
+
+*(Note: All endpoints in this section require Administrator privileges.)*
+
+### **`GET /admin/blocks/all`**
+
+-   **Description:** Get a paginated list of all climbing blocks in the system. Provides more detailed information than the public block listing. Requires Admin privileges.
+-   **Query Parameters (optional):**
+    -   `page` (Integer, default: 1): Page number for pagination.
+    -   `per_page` (Integer, default: 20): Number of blocks per page.
+-   **Success Response (200 OK):**
+    ```json
+    {
+      "blocks": [
+        {
+          "id": 1,
+          "uuid": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+          "name": "Admin View Block 1",
+          "difficulty": "V5",
+          "photo_filename": "image.jpg",
+          "photo_url": "/blocks/uploads/image.jpg", 
+          "highlight_data": "{\"holds\": []}",
+          "uploader_id": 1,
+          "uploader_username": "testuser",
+          "created_at": "YYYY-MM-DDTHH:MM:SS.ffffffZ",
+          "updated_at": "YYYY-MM-DDTHH:MM:SS.ffffffZ",
+          "tags": [{"id": 1, "name": "overhang"}] 
+        }
+        // ... more blocks
+      ],
+      "total_blocks": 100, 
+      "current_page": 1,
+      "total_pages": 5,
+      "per_page": 20
+    }
+    ```
+-   **Error Responses:**
+    -   **403 Forbidden:** `{"error": "Admin access required."}`
+
+### **`GET /admin/blocks/needs-photo`**
+
+-   **Description:** Get a paginated list of all climbing blocks that do not currently have an associated photo (`photo_filename` is null). Requires Admin privileges.
+-   **Query Parameters (optional):**
+    -   `page` (Integer, default: 1): Page number for pagination.
+    -   `per_page` (Integer, default: 20): Number of blocks per page.
+-   **Success Response (200 OK):** (Structure is the same as `/admin/blocks/all`, but `photo_filename` and `photo_url` will be null)
+    ```json
+    {
+      "blocks": [
+        {
+          "id": 2,
+          "uuid": "b2c3d4e5-f6g7-8901-2345-67890abcdef1",
+          "name": "Block Missing Photo",
+          "difficulty": "V3",
+          "photo_filename": null,
+          "photo_url": null,
+          "highlight_data": null,
+          "uploader_id": 2,
+          "uploader_username": "anotheruser",
+          "created_at": "YYYY-MM-DDTHH:MM:SS.ffffffZ",
+          "updated_at": "YYYY-MM-DDTHH:MM:SS.ffffffZ",
+          "tags": []
+        }
+        // ... more blocks needing photos
+      ],
+      "total_blocks": 10, // Example
+      "current_page": 1,
+      "total_pages": 1, // Example
+      "per_page": 20
+    }
+    ```
+-   **Error Responses:**
+    -   **403 Forbidden:** `{"error": "Admin access required."}`
+
+## 11. Leaderboard (`/leaderboard`)
 
 ### **GET `/leaderboard/`**
 

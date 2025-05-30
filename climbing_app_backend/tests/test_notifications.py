@@ -1,10 +1,16 @@
 # tests/test_notifications.py
 import pytest
 import json
-from unittest.mock import patch, call # Added
-from app.models.models import PushSubscription, User, db, Comment, UserAttempt, ClimbingBlock # Added models
-from app.services.badge_service import award_badge, _ensure_badge_exists, BADGE_FIRST_COMMENT, BADGE_BLOCK_UPLOADER, BADGE_FIRST_COMPLETED_CLIMB # Added
-from app.services.notification_service import send_notification # For direct testing if needed, though mostly testing through side effects
+from unittest.mock import patch, call 
+from flask import current_app # Added
+from app.models.models import PushSubscription, User, db, Comment, UserAttempt, ClimbingBlock, Badge, UserBadge # Added Badge, UserBadge
+from app.services.badge_service import award_badge, _ensure_badge_exists, BADGE_FIRST_COMMENT, BADGE_BLOCK_UPLOADER, BADGE_FIRST_COMPLETED_CLIMB, PREDEFINED_BADGES # Added PREDEFINED_BADGES
+from app.services.notification_service import ( # Added notification type constants
+    send_notification, 
+    NOTIFICATION_TYPE_BADGE_EARNED,
+    NOTIFICATION_TYPE_NEW_BLOCK_BY_FOLLOWED,
+    NOTIFICATION_TYPE_COMMENT_ON_OWN_BLOCK
+)
 from flask_babel import gettext as _
 from tests.conftest import create_test_user, login_test_user
 
@@ -239,3 +245,150 @@ def test_notification_expired_subscription_deletion(mock_webpush, auth_client, u
     with app.app_context():
         # db.session.refresh(user1_fixture) # Refresh to see updated relationship, though not strictly needed
         assert PushSubscription.query.filter_by(user_id=user1_fixture.id).count() == 0
+
+
+# --- Tests for Notification Preferences ---
+
+def set_user_notification_preference(app, user_id, pref_key, value):
+    with app.app_context():
+        user = User.query.get(user_id)
+        setattr(user, pref_key, value)
+        db.session.commit()
+
+@patch('app.services.notification_service.webpush')
+def test_notification_preference_badge_earned(mock_webpush, auth_client, user1_fixture, app, create_block):
+    # Ensure user has a push subscription
+    with app.app_context(): 
+        PushSubscription.query.filter_by(user_id=user1_fixture.id).delete()
+        ps = PushSubscription(user_id=user1_fixture.id, subscription_json=json.dumps(SAMPLE_SUBSCRIPTION_1))
+        db.session.add(ps)
+        db.session.commit()
+
+    # Test Case 1: Preference is True (default) - Should send
+    set_user_notification_preference(app, user1_fixture.id, 'notify_on_badge_earned', True)
+    # Trigger badge award (e.g., first comment)
+    block_json = create_block(name="Badge Pref Block True") 
+    # Ensure this is the first comment for this user in this session to guarantee badge award
+    with app.app_context():
+        Comment.query.filter_by(user_id=user1_fixture.id).delete()
+        badge_to_check = Badge.query.filter_by(name=PREDEFINED_BADGES[BADGE_FIRST_COMMENT]["name"]).first()
+        if badge_to_check:
+            UserBadge.query.filter_by(user_id=user1_fixture.id, badge_id=badge_to_check.id).delete()
+        db.session.commit()
+    auth_client.post(f'/blocks/{block_json["id"]}/comments', json={'text': 'Comment for badge pref test (pref true)'})
+    mock_webpush.assert_called() 
+    mock_webpush.reset_mock()
+
+    # Test Case 2: Preference is False - Should NOT send
+    set_user_notification_preference(app, user1_fixture.id, 'notify_on_badge_earned', False)
+    # Trigger another action that would award a *different* badge (First Summit)
+    with app.app_context():
+        badge_summit_def = Badge.query.filter_by(name=PREDEFINED_BADGES[BADGE_FIRST_COMPLETED_CLIMB]["name"]).first()
+        if badge_summit_def: # Ensure badge definition exists
+            UserBadge.query.filter_by(user_id=user1_fixture.id, badge_id=badge_summit_def.id).delete()
+        # Ensure no completed attempts exist to guarantee badge award
+        UserAttempt.query.filter_by(user_id=user1_fixture.id, status='completed').delete()
+        db.session.commit()
+    
+    block_json_2 = create_block(name="Badge Pref Block False")
+    auth_client.post('/history/attempts', json={'block_id': block_json_2['id'], 'status': 'completed'})
+    mock_webpush.assert_not_called()
+
+
+@patch('app.services.notification_service.webpush')
+def test_notification_preference_new_block_by_followed(mock_webpush, auth_client, client, user1_fixture, user2_details_fixture, app):
+    # user1_fixture is uploader (auth_client)
+    # user2_details_fixture is follower (client)
+
+    # Ensure user2 has a push subscription
+    with app.app_context():
+        PushSubscription.query.filter_by(user_id=user2_details_fixture['id']).delete()
+        ps_user2 = PushSubscription(user_id=user2_details_fixture['id'], subscription_json=json.dumps(SAMPLE_SUBSCRIPTION_2))
+        db.session.add(ps_user2)
+        # Ensure user2 is following user1
+        user1 = User.query.get(user1_fixture.id)
+        user2 = User.query.get(user2_details_fixture['id'])
+        if not user1.followers.filter(User.id == user2.id).count() > 0: # Check if user2 is a follower of user1
+             user2.followed.append(user1) # If not, user2 follows user1
+        db.session.commit()
+       
+    login_test_user(client, user2_details_fixture['email']) # client is now user2
+
+    # Test Case 1: Follower's preference is True - Should send
+    set_user_notification_preference(app, user2_details_fixture['id'], 'notify_on_new_block_by_followed', True)
+    create_block_response = auth_client.post('/blocks/', data={'name': 'Notify Follower Block True', 'difficulty': 'V1'}) # user1 creates block
+    assert create_block_response.status_code == 201
+    created_block_id = create_block_response.json['block']['id']
+
+    mock_webpush.assert_called_with(
+        subscription_info=SAMPLE_SUBSCRIPTION_2, 
+        data=json.dumps({
+            "title": "New Block Alert!", 
+            "body": f"{user1_fixture.username} just added a new block: Notify Follower Block True",
+            "url": f"/blocks/{created_block_id}"
+        }),
+        vapid_private_key=current_app.config['VAPID_PRIVATE_KEY'],
+        vapid_claims=current_app.config['VAPID_CLAIMS']
+    )
+    mock_webpush.reset_mock()
+
+    # Test Case 2: Follower's preference is False - Should NOT send
+    set_user_notification_preference(app, user2_details_fixture['id'], 'notify_on_new_block_by_followed', False)
+    auth_client.post('/blocks/', data={'name': 'Notify Follower Block False', 'difficulty': 'V2'}) # user1 creates another block
+    mock_webpush.assert_not_called()
+
+
+@patch('app.services.notification_service.webpush')
+def test_notification_preference_comment_on_own_block(mock_webpush, auth_client, client, user1_fixture, user2_details_fixture, create_block, app):
+    # user1_fixture is block owner (auth_client)
+    # user2_details_fixture is commenter (client)
+    block_json = create_block(name="Comment Pref Block") # Block created by user1 (auth_client)
+
+    # Ensure user1 (block owner) has a push subscription
+    with app.app_context():
+        PushSubscription.query.filter_by(user_id=user1_fixture.id).delete()
+        ps_user1 = PushSubscription(user_id=user1_fixture.id, subscription_json=json.dumps(SAMPLE_SUBSCRIPTION_1))
+        db.session.add(ps_user1)
+        db.session.commit()
+
+    login_test_user(client, user2_details_fixture['email']) # client is now user2
+
+    # Test Case 1: Block owner's preference is True - Should send
+    set_user_notification_preference(app, user1_fixture.id, 'notify_on_comment_on_own_block', True)
+    comment_text = "A comment from user2 on user1's block (pref true)"
+    client.post(f'/blocks/{block_json["id"]}/comments', json={'text': comment_text})
+    
+    expected_payload = {
+        "title": "New Comment on Your Block",
+        "body": f"{user2_details_fixture['username']} commented on your block '{block_json['name']}': {comment_text[:50] + '...' if len(comment_text) > 50 else comment_text}",
+        "url": f"/blocks/{block_json['id']}/comments"
+    }
+    mock_webpush.assert_called_with(
+        subscription_info=SAMPLE_SUBSCRIPTION_1,
+        data=json.dumps(expected_payload),
+        vapid_private_key=current_app.config['VAPID_PRIVATE_KEY'],
+        vapid_claims=current_app.config['VAPID_CLAIMS']
+    )
+    mock_webpush.reset_mock()
+
+    # Test Case 2: Block owner's preference is False - Should NOT send
+    set_user_notification_preference(app, user1_fixture.id, 'notify_on_comment_on_own_block', False)
+    client.post(f'/blocks/{block_json["id"]}/comments', json={'text': "Another comment from user2 (pref false)"})
+    mock_webpush.assert_not_called()
+
+@patch('app.services.notification_service.webpush')
+def test_comment_on_own_block_no_notification_to_self(mock_webpush, auth_client, user1_fixture, create_block, app):
+    # user1_fixture (auth_client) comments on their own block
+    block_json = create_block(name="Self Comment Block") # Block created by user1
+
+    # Ensure user1 (block owner) has a push subscription and pref is True
+    with app.app_context():
+        PushSubscription.query.filter_by(user_id=user1_fixture.id).delete()
+        ps_user1 = PushSubscription(user_id=user1_fixture.id, subscription_json=json.dumps(SAMPLE_SUBSCRIPTION_1))
+        db.session.add(ps_user1)
+        db.session.commit()
+    set_user_notification_preference(app, user1_fixture.id, 'notify_on_comment_on_own_block', True)
+    
+    # user1 posts a comment on their own block
+    auth_client.post(f'/blocks/{block_json["id"]}/comments', json={'text': "User1 commenting own block"})
+    mock_webpush.assert_not_called() # Should not notify self for own comment

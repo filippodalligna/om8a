@@ -1,8 +1,8 @@
 from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
 from app import db
-from app.models.models import UserAttempt, User, ClimbingBlock # UserAttempt is already here
-from app.services.badge_service import award_badge, BADGE_FIRST_COMPLETED_CLIMB # Added
+from app.models.models import UserAttempt, User, ClimbingBlock
+from app.services.badge_service import award_badge, BADGE_FIRST_COMPLETED_CLIMB, check_and_award_climbing_milestone_badges # Updated imports
 
 # Define the blueprint
 bp = Blueprint('history', __name__, url_prefix='/history') # url_prefix is defined here
@@ -63,8 +63,17 @@ def log_attempt():
 
     # Award "First Summit" badge if it's the user's first completed climb
     if new_attempt.status == 'completed':
+        # Award "First Summit" badge if it's the user's first completed climb
         if UserAttempt.query.filter_by(user_id=current_user.id, status='completed').count() == 1:
             award_badge(current_user.id, BADGE_FIRST_COMPLETED_CLIMB)
+        
+        # Check for other milestone badges
+        # The 'block' object is already fetched earlier in this function
+        if block: # Ensure block object is available
+            check_and_award_climbing_milestone_badges(current_user.id, new_attempt.block_id, block.difficulty)
+        else:
+            # This case should be rare as block is fetched before creating an attempt
+            print(f"Error: Block with ID {new_attempt.block_id} not found when checking milestone badges for user {current_user.id}.")
             
     return jsonify({'message': 'Attempt logged successfully', 'attempt': attempt_data}), 201
 
