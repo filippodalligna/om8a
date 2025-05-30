@@ -2,7 +2,8 @@ from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
 from flask_babel import gettext as _
 from app import db
-from app.models.models import User, user_follows # Import user_follows table for direct use in filters if needed
+from app.models.models import User, user_follows
+from app.services.stats_service import get_user_stats # Added import
 
 users_bp = Blueprint('users', __name__, url_prefix='/users')
 
@@ -43,15 +44,15 @@ def get_user_followers(user_id):
     user = User.query.get_or_404(user_id)
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
-    
+
     # 'user.followers' is the dynamic backref from the 'followed' relationship
     followers_pagination = user.followers.paginate(page=page, per_page=per_page, error_out=False)
     followers_data = [{'id': u.id, 'username': u.username} for u in followers_pagination.items]
-    
+
     return jsonify({
-        'followers': followers_data, 
-        'total': followers_pagination.total, 
-        'pages': followers_pagination.pages, 
+        'followers': followers_data,
+        'total': followers_pagination.total,
+        'pages': followers_pagination.pages,
         'current_page': followers_pagination.page
     }), 200
 
@@ -64,10 +65,22 @@ def get_user_following(user_id):
     # 'user.followed' is the relationship representing users this 'user' is following
     followed_pagination = user.followed.paginate(page=page, per_page=per_page, error_out=False)
     followed_data = [{'id': u.id, 'username': u.username} for u in followed_pagination.items]
-    
+
     return jsonify({
-        'following': followed_data, 
-        'total': followed_pagination.total, 
-        'pages': followed_pagination.pages, 
+        'following': followed_data,
+        'total': followed_pagination.total,
+        'pages': followed_pagination.pages,
         'current_page': followed_pagination.page
     }), 200
+
+@users_bp.route('/<int:user_id>/stats', methods=['GET'])
+@login_required
+def get_user_statistics(user_id):
+    # Allow user to see their own stats, or admin to see anyone's
+    if not current_user.is_admin and current_user.id != user_id:
+        return jsonify({'error': _('You are not authorized to view these statistics.')}), 403
+
+    stats = get_user_stats(user_id)
+    if stats is None: # User not found by service
+        return jsonify({'error': _('User not found.')}), 404
+    return jsonify(stats), 200

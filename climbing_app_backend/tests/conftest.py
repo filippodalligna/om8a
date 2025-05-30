@@ -7,12 +7,12 @@ def app():
     """Session-wide test Flask application."""
     # Ensure instance_path is correctly set if UPLOAD_FOLDER relies on it
     # For testing, UPLOAD_FOLDER might need to be a temporary directory
-    
+
     # Determine the absolute path for the instance folder for tests
     # This assumes tests are run from the project root 'climbing_app_backend'
     project_root = os.path.abspath(os.path.dirname(os.path.dirname(__file__))) # This gets climbing_app_backend folder
     instance_path = os.path.join(project_root, 'tests', 'test_instance')
-    
+
     # Create a specific test upload folder within the test instance path
     test_upload_folder_name = 'test_uploads'
     test_upload_folder_abs_path = os.path.join(instance_path, test_upload_folder_name)
@@ -25,7 +25,7 @@ def app():
         'UPLOAD_FOLDER': test_upload_folder_name, # Relative to instance_path
         'SERVER_NAME': 'localhost.test' # Common for testing, helps with url_for
     })
-    
+
     # Ensure the instance path for the app object matches our desired test instance path
     app.instance_path = instance_path
 
@@ -42,7 +42,7 @@ def app():
 
     with app.app_context():
         db.drop_all() # Drop all database tables after test session
-    
+
     # Clean up test instance folder
     # import shutil
     # shutil.rmtree(instance_path, ignore_errors=True)
@@ -79,7 +79,7 @@ def auth_client(client):
             # If password not provided, try to use stored one from registration
             if password is None:
                 password = self._user_credentials.get(email, 'password')
-            
+
             return self._client.post('/auth/login', json={
                 'email': email,
                 'password': password
@@ -92,9 +92,9 @@ def auth_client(client):
     auth = AuthActions(client)
     auth.register(username='defaultuser', email='default@example.com', password='password')
     auth.login(email='default@example.com') # Login as the default user
-    
+
     # Make auth actions available to tests if they need to register/login other users
-    client.auth = auth 
+    client.auth = auth
     return client # now the client has session cookies for an authenticated user
 
 @pytest.fixture
@@ -117,7 +117,7 @@ def user1_fixture(app, auth_client): # Added app fixture to ensure context
         if not user:
             # Fallback if the default user from auth_client isn't found by that email
             # This might happen if auth_client's details change or it's the very first user (ID 1)
-            user = User.query.get(1) 
+            user = User.query.get(1)
         if not user:
             # If still not found, it's an issue with the auth_client setup or test DB state
             pytest.skip("Default user for auth_client (default@example.com or ID 1) not found. Check conftest.py's auth_client setup.")
@@ -148,3 +148,21 @@ def create_block_db(app): # Moved from test_badges.py to be globally available
             db.session.commit()
             return block
     return _create_block_db
+
+@pytest.fixture
+def log_completed_climb_for_stats(app): # Simplified: uses current time for recorded_at
+    """Fixture to log a completed climb directly in the DB for stats testing."""
+    from app.models.models import UserAttempt, db # Import here
+    from datetime import datetime # Import here
+    def _log_climb(user_id, block_id):
+        with app.app_context():
+            attempt = UserAttempt(
+                user_id=user_id,
+                block_id=block_id,
+                status='completed',
+                recorded_at=datetime.utcnow() # Or let DB default if model has it
+            )
+            db.session.add(attempt)
+            db.session.commit()
+            return attempt
+    return _log_climb

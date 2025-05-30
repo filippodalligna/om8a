@@ -21,7 +21,7 @@ def user1_fixture(auth_client):
         if not user:
             # Fallback if the default user from auth_client isn't found by that email
             # This might happen if auth_client's details change or it's the very first user (ID 1)
-            user = User.query.get(1) 
+            user = User.query.get(1)
         if not user:
             pytest.skip("Default user for auth_client not reliably found, skipping dependent tests.")
         return user
@@ -45,7 +45,7 @@ def test_follow_user(auth_client, user1_fixture, user2_details_fixture):
     assert f"You are now following {user2_details_fixture['username']}" in response.json['message']
 
     with auth_client.application.app_context():
-        db.session.refresh(user1_fixture) 
+        db.session.refresh(user1_fixture)
         assert user1_fixture.followed.filter(User.id == user2_details_fixture["id"]).count() == 1
 
 
@@ -82,7 +82,7 @@ def test_unfollow_not_following(auth_client, user1_fixture, user2_details_fixtur
 def test_list_followers(auth_client, client, user1_fixture, user2_details_fixture, app):
     # user2 (represented by 'client' after login) follows user1_fixture
     with app.app_context(): # Ensure client operations are within context if they touch db indirectly
-        login_test_user(client, user2_details_fixture['email']) 
+        login_test_user(client, user2_details_fixture['email'])
 
     client.post(f'/users/{user1_fixture.id}/follow')
 
@@ -99,7 +99,7 @@ def test_list_following(auth_client, user1_fixture, user2_details_fixture):
 
     response = auth_client.get(f'/users/{user1_fixture.id}/following')
     assert response.status_code == 200
-    assert response.json['total'] >= 1 
+    assert response.json['total'] >= 1
     following_usernames = [f['username'] for f in response.json['following']]
     assert user2_details_fixture['username'] in following_usernames
 
@@ -110,16 +110,16 @@ def test_list_followers_pagination(auth_client, client, user1_fixture, app):
         for i in range(3):
             username = f'follower_p{i}'
             email = f'follower_p{i}@example.com'
-            
+
             # Create a new client for each user's operations
             temp_page_client = app.test_client()
-            
+
             reg_response = create_test_user(temp_page_client, username, email)
             assert reg_response.status_code == 201 # Ensure user registration
-            
+
             login_response = login_test_user(temp_page_client, email)
             assert login_response.status_code == 200 # Ensure user login
-            
+
             # This user (temp_page_client) follows user1_fixture
             follow_response = temp_page_client.post(f'/users/{user1_fixture.id}/follow')
             assert follow_response.status_code == 200 # Ensure follow action
@@ -127,7 +127,7 @@ def test_list_followers_pagination(auth_client, client, user1_fixture, app):
             follower_user = User.query.filter_by(email=email).first()
             assert follower_user is not None
             follower_users.append(follower_user)
-    
+
     # Now check pagination for user1_fixture's followers
     # Use the main 'client' or 'auth_client' which is not following/followed by these new users
     response = client.get(f'/users/{user1_fixture.id}/followers?page=1&per_page=2')

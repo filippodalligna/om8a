@@ -20,7 +20,7 @@ class User(db.Model, UserMixin):
         'User', secondary='user_follows', # Use string name of the table
         primaryjoin=lambda: (User.id == user_follows.c.follower_id),
         secondaryjoin=lambda: (User.id == user_follows.c.followed_id),
-        backref=db.backref('followers', lazy='dynamic'), 
+        backref=db.backref('followers', lazy='dynamic'),
         lazy='dynamic'
     )
     is_admin = db.Column(db.Boolean, nullable=False, default=False) # Added
@@ -29,6 +29,7 @@ class User(db.Model, UserMixin):
     notify_on_comment_on_own_block = db.Column(db.Boolean, nullable=False, default=True)
     notify_on_badge_earned = db.Column(db.Boolean, nullable=False, default=True)
     notify_on_new_block_by_followed = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow) # Added
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)

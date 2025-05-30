@@ -2,7 +2,7 @@
 from app.models.models import db, User, Badge, UserBadge, Comment, UserAttempt, ClimbingBlock
 from flask_babel import gettext as _
 from app.services.notification_service import send_notification, NOTIFICATION_TYPE_BADGE_EARNED # Updated import
-from datetime import datetime, timedelta 
+from datetime import datetime, timedelta
 
 # Define badge name keys (constants)
 BADGE_FIRST_COMMENT = "BADGE_FIRST_COMMENT"
@@ -65,7 +65,7 @@ def award_badge(user_id, badge_key):
     # Award the badge
     user_badge = UserBadge(user_id=user.id, badge_id=badge.id)
     db.session.add(user_badge)
-    db.session.commit() 
+    db.session.commit()
     print(f"Awarded badge '{badge.name}' to user {user.id}") # For logging
 
     # Placeholder for sending a notification about the new badge
@@ -73,7 +73,7 @@ def award_badge(user_id, badge_key):
         # Assuming badge.name is the direct display name (e.g., "Commentator")
         # If badge.name were a translation key, _(badge.name) would fetch the translation.
         # For now, we'll assume it's already a displayable string.
-        badge_display_name = badge.name 
+        badge_display_name = badge.name
         payload = {
             "title": _("New Badge Earned!"),
             "body": _("You've earned the '%(badge_name)s' badge.", badge_name=badge_display_name),
@@ -82,8 +82,8 @@ def award_badge(user_id, badge_key):
         send_notification(user, payload, NOTIFICATION_TYPE_BADGE_EARNED) # Updated call
     except Exception as e:
         # Log error, but don't let notification failure break badge awarding
-        print(f"Error trying to send badge notification for user {user.id}, badge {badge.name}: {e}") 
-    
+        print(f"Error trying to send badge notification for user {user.id}, badge {badge.name}: {e}")
+
     return True
 
 def check_and_award_climbing_milestone_badges(user_id, completed_attempt_block_id, completed_attempt_difficulty):
@@ -98,7 +98,7 @@ def check_and_award_climbing_milestone_badges(user_id, completed_attempt_block_i
         return
 
     # --- Logic for BADGE_DIFFICULTY_MASTER_V3 ---
-    badge_v3_def = _ensure_badge_exists(BADGE_DIFFICULTY_MASTER_V3) 
+    badge_v3_def = _ensure_badge_exists(BADGE_DIFFICULTY_MASTER_V3)
     if badge_v3_def and not UserBadge.query.filter_by(user_id=user.id, badge_id=badge_v3_def.id).first():
         # Check only if the current completed climb is a V3
         if completed_attempt_difficulty == "V3": # Or more flexible grade comparison
@@ -108,7 +108,7 @@ def check_and_award_climbing_milestone_badges(user_id, completed_attempt_block_i
                 .filter(UserAttempt.status == 'completed') \
                 .filter(ClimbingBlock.difficulty == "V3") \
                 .distinct().count()
-            
+
             if completed_v3_climbs_count >= 3:
                 award_badge(user.id, BADGE_DIFFICULTY_MASTER_V3)
 

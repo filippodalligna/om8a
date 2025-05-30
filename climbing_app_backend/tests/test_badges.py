@@ -1,7 +1,7 @@
 # tests/test_badges.py
 import pytest
-import io 
-from app.models.models import Badge, UserBadge, User, db, Comment, UserAttempt, ClimbingBlock 
+import io
+from app.models.models import Badge, UserBadge, User, db, Comment, UserAttempt, ClimbingBlock
 from app.services.badge_service import PREDEFINED_BADGES, BADGE_FIRST_COMMENT, BADGE_FIRST_COMPLETED_CLIMB, BADGE_BLOCK_UPLOADER, BADGE_DIFFICULTY_MASTER_V3, BADGE_WEEKLY_SENDER_3 # Updated imports
 from datetime import datetime, timedelta # Added timedelta
 
@@ -27,7 +27,7 @@ def assign_badge_to_user_direct(app, create_badge_direct):
             badge = Badge.query.filter_by(name=badge_name).first()
             if not badge:
                 badge = create_badge_direct(name=badge_name) # Create if doesn't exist for test simplicity
-            
+
             # Check if this UserBadge association already exists
             user_badge = UserBadge.query.filter_by(user_id=user_id, badge_id=badge.id).first()
             if user_badge:
@@ -37,7 +37,7 @@ def assign_badge_to_user_direct(app, create_badge_direct):
                 user_badge = UserBadge(user_id=user_id, badge_id=badge.id)
                 if earned_at:
                     user_badge.earned_at = earned_at
-            
+
             db.session.add(user_badge) # Add or re-add to session if updated
             db.session.commit()
             return user_badge
@@ -50,11 +50,11 @@ def test_list_all_badges(client, create_badge_direct):
 
     response = client.get('/badges/') # No auth typically needed for listing badges
     assert response.status_code == 200
-    
+
     # Filter out pre-existing badges from other tests if any by checking specific names
     response_data = response.json
     filtered_badges = [b for b in response_data if b['name'] in ["FirstClimb", "V5Conqueror"]]
-    
+
     assert len(filtered_badges) >= 2 # Check if our created badges are present
     badge_names = [b['name'] for b in filtered_badges]
     assert "FirstClimb" in badge_names
@@ -70,7 +70,7 @@ def test_list_badges_empty(client, app): # Added app to clean up
         UserBadge.query.delete()
         Badge.query.delete()
         db.session.commit()
-        
+
     response = client.get('/badges/')
     assert response.status_code == 200
     assert len(response.json) == 0
@@ -82,7 +82,7 @@ def test_list_user_earned_badges(client, user1_fixture, assign_badge_to_user_dir
 
     assign_badge_to_user_direct(user_id=user_id, badge_name="SocialButterfly", earned_at=datetime.utcnow())
     assign_badge_to_user_direct(user_id=user_id, badge_name="EarlyBird")
-    
+
     response = client.get(f'/badges/users/{user_id}/badges')
     assert response.status_code == 200
     assert len(response.json) == 2
@@ -98,7 +98,7 @@ def test_list_user_earned_badges_none(client, user1_fixture, app): # Added app t
     with app.app_context():
         UserBadge.query.filter_by(user_id=user_id).delete()
         db.session.commit()
-        
+
     response = client.get(f'/badges/users/{user_id}/badges')
     assert response.status_code == 200
     assert len(response.json) == 0
@@ -119,7 +119,7 @@ def test_award_badge_first_comment(auth_client, user1_fixture, create_block, app
         badge_def = Badge.query.filter_by(name=PREDEFINED_BADGES[BADGE_FIRST_COMMENT]["name"]).first()
         if badge_def: # Badge might not exist if this is the first time it's being awarded
             assert UserBadge.query.filter_by(user_id=user1_fixture.id, badge_id=badge_def.id).first() is None
-    
+
     # Post the first comment
     auth_client.post(f'/blocks/{block_id}/comments', json={'text': 'My first comment!'})
 
@@ -128,7 +128,7 @@ def test_award_badge_first_comment(auth_client, user1_fixture, create_block, app
         # _ensure_badge_exists would have created it if it wasn't there
         badge_def = Badge.query.filter_by(name=PREDEFINED_BADGES[BADGE_FIRST_COMMENT]["name"]).first()
         assert badge_def is not None, "Badge definition should have been created"
-        
+
         user_badge = UserBadge.query.filter_by(user_id=user1_fixture.id, badge_id=badge_def.id).first()
         assert user_badge is not None
         assert user_badge.badge.name == PREDEFINED_BADGES[BADGE_FIRST_COMMENT]["name"]
@@ -163,7 +163,7 @@ def test_award_badge_first_completed_climb(auth_client, user1_fixture, create_bl
         user_badge = UserBadge.query.filter_by(user_id=user1_fixture.id, badge_id=badge_def.id).first()
         assert user_badge is not None
         assert user_badge.badge.name == PREDEFINED_BADGES[BADGE_FIRST_COMPLETED_CLIMB]["name"]
-    
+
     # Record another 'completed' attempt - badge should not be awarded again
     block2_json = create_block(name="Second Block")
     auth_client.post('/history/attempts', json={
@@ -197,7 +197,7 @@ def test_award_badge_block_uploader_with_photo(auth_client, user1_fixture, app):
 def test_badge_block_uploader_no_photo(auth_client, user1_fixture, app):
     # Upload a block without a photo
     auth_client.post('/blocks/', data={'name': 'NoPhoto Block', 'difficulty': 'V0'})
-    
+
     with app.app_context():
         # Badge definition might be created by _ensure_badge_exists if any other test triggered it,
         # but it should not be awarded to this user.
@@ -225,7 +225,7 @@ def log_completed_climb(auth_client, user1_fixture): # user1_fixture here is imp
         payload = {'block_id': block_id, 'status': 'completed'}
         return auth_client.post('/history/attempts', json=payload)
     return _log_completed_climb
-    
+
 @pytest.fixture
 def log_completed_climb_direct_db(app, user1_fixture):
     def _log_climb(block_id, recorded_at_datetime):
@@ -259,7 +259,7 @@ def test_award_badge_v3_master(user1_fixture, auth_client, create_block_db, log_
     log_completed_climb(block_v3_1.id)
     log_completed_climb(block_v2_1.id) # This V2 climb should not count towards V3 master
     log_completed_climb(block_v3_2.id)
-    
+
     # User should not have the badge yet (only 2 V3s)
     with app.app_context():
         badge_def = Badge.query.filter_by(name=PREDEFINED_BADGES[BADGE_DIFFICULTY_MASTER_V3]["name"]).first()
@@ -295,13 +295,13 @@ def test_award_badge_weekly_sender_3(user1_fixture, auth_client, create_block_db
     log_completed_climb_direct_db(block1.id, recorded_at_datetime=four_days_ago)
     log_completed_climb_direct_db(block2.id, recorded_at_datetime=two_days_ago)
     log_completed_climb_direct_db(block4.id, recorded_at_datetime=eight_days_ago) # Old climb
-    
+
     # User should not have the badge yet (only 2 recent unique climbs recorded directly)
     with app.app_context():
         badge_def = Badge.query.filter_by(name=PREDEFINED_BADGES[BADGE_WEEKLY_SENDER_3]["name"]).first()
         assert badge_def is not None
         assert UserBadge.query.filter_by(user_id=user1_fixture.id, badge_id=badge_def.id).first() is None
-    
+
     # Log the 3rd recent unique climb via API to trigger the service logic
     response = auth_client.post('/history/attempts', json={'block_id': block3.id, 'status': 'completed'})
     assert response.status_code == 201

@@ -14,7 +14,7 @@ def test_create_duplicate_tag(auth_client):
     # Ensure the tag is created the first time
     response1 = auth_client.post('/tags/', json={'name': 'Slab'})
     assert response1.status_code == 201 # Or 409 if it somehow existed from another test (unlikely with test DB setup)
-    
+
     # Attempt to create the same tag again
     response2 = auth_client.post('/tags/', json={'name': 'Slab'})
     assert response2.status_code == 409 # Conflict
@@ -31,11 +31,11 @@ def test_list_tags(client, auth_client): # Added auth_client to create tags
     response = client.get('/tags/') # Listing tags does not require auth
     assert response.status_code == 200
     assert isinstance(response.json, list)
-    
+
     tag_names = [tag['name'] for tag in response.json]
     assert 'dynamic' in tag_names
     assert 'static' in tag_names
-    
+
     # Check for at least two tags, could be more if other tests created some
     # and DB is not perfectly clean between tests (though it should be with session-scoped app fixture)
     assert len(response.json) >= 2

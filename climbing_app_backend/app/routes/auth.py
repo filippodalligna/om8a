@@ -48,7 +48,7 @@ def login():
             'message': _('Login successful'),
             'user': {'id': user.id, 'username': user.username, 'email': user.email}
         }), 200
-    
+
     return jsonify({'message': _('Invalid credentials')}), 401
 
 @bp.route('/logout', methods=['POST'])

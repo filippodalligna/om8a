@@ -29,12 +29,12 @@ def upgrade() -> None:
         sa.column('id', sa.Integer),
         sa.column('uuid', sa.String(length=36))
     )
-    
+
     conn = op.get_bind()
     # Select all rows (assuming all existing rows need a UUID)
     # It's safer to select rows where uuid IS NULL if this script could be re-run partially
     results = conn.execute(sa.select(climbing_block_table.c.id).where(climbing_block_table.c.uuid == None)).fetchall()
-    
+
     for row in results:
         block_id = row[0]
         op.execute(

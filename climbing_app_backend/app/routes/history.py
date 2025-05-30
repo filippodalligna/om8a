@@ -24,7 +24,7 @@ def log_attempt():
 
     if not isinstance(block_id, int):
          return jsonify({'message': 'block_id must be an integer'}), 400
-        
+
     if status not in ['tried', 'completed']:
         return jsonify({'message': "Invalid status value. Must be 'tried' or 'completed'."}), 400
 
@@ -44,7 +44,7 @@ def log_attempt():
 
     db.session.add(new_attempt)
     db.session.commit()
-    
+
     attempt_data = {
         'id': new_attempt.id,
         'user_id': new_attempt.user_id,
@@ -66,7 +66,7 @@ def log_attempt():
         # Award "First Summit" badge if it's the user's first completed climb
         if UserAttempt.query.filter_by(user_id=current_user.id, status='completed').count() == 1:
             award_badge(current_user.id, BADGE_FIRST_COMPLETED_CLIMB)
-        
+
         # Check for other milestone badges
         # The 'block' object is already fetched earlier in this function
         if block: # Ensure block object is available
@@ -74,14 +74,14 @@ def log_attempt():
         else:
             # This case should be rare as block is fetched before creating an attempt
             print(f"Error: Block with ID {new_attempt.block_id} not found when checking milestone badges for user {current_user.id}.")
-            
+
     return jsonify({'message': 'Attempt logged successfully', 'attempt': attempt_data}), 201
 
 @bp.route('/me', methods=['GET'])
 @login_required
 def get_my_history():
     attempts = UserAttempt.query.filter_by(user_id=current_user.id).order_by(UserAttempt.recorded_at.desc()).all()
-    
+
     attempts_data = []
     for attempt in attempts:
         block = ClimbingBlock.query.get(attempt.block_id) # Query block for details
@@ -109,7 +109,7 @@ def get_user_history(user_id):
     # Query only 'completed' attempts for the specified user_id
     attempts = UserAttempt.query.filter_by(user_id=user_id, status='completed') \
                                 .order_by(UserAttempt.recorded_at.desc()).all()
-    
+
     attempts_data = []
     for attempt in attempts:
         block = ClimbingBlock.query.get(attempt.block_id) # Query block for details
@@ -120,7 +120,7 @@ def get_user_history(user_id):
             'block_difficulty': block.difficulty if block else 'Unknown',
             'status': attempt.status, # Will always be 'completed' due to query filter
             # Optional fields might be excluded for public view depending on privacy rules
-            # 'attempts_count': attempt.attempts_count, 
+            # 'attempts_count': attempt.attempts_count,
             # 'time_taken': attempt.time_taken,
             # 'sensations': attempt.sensations,
             # 'personal_notes': attempt.personal_notes,

@@ -16,11 +16,11 @@ def create_comment_direct(app, auth_client, create_block):
             # Fallback if defaultuser is somehow not created or named differently
             # This indicates an issue with conftest.py's auth_client setup consistency
             pytest.fail("Default user for auth_client not found. Check conftest.py.")
-        
+
         user_id_for_comment = default_user.id
-        
+
     block_json = create_block() # Create a block to comment on
-    
+
     def _make_comment(text='Initial comment text'):
         with app.app_context(): # Ensure DB operations are within app context
             comment = Comment(text=text, block_id=block_json['id'], user_id=user_id_for_comment)
@@ -31,7 +31,7 @@ def create_comment_direct(app, auth_client, create_block):
 
 def test_update_own_comment(auth_client, create_comment_direct):
     comment = create_comment_direct(text='Original Comment')
-    
+
     response = auth_client.put(f'/comments/{comment.id}', json={'text': 'Updated Comment Text'})
     assert response.status_code == 200
     assert response.json['comment']['text'] == 'Updated Comment Text'
@@ -56,21 +56,21 @@ def test_update_other_users_comment(client, auth_client, create_comment_direct, 
     # client.auth is available from conftest.py if client is an instance of the test_client
     # However, the 'client' fixture is a raw, unauthenticated client.
     # We need to use its post method for registration/login.
-    
+
     reg_res = client.post('/auth/register', json={'username': 'user2', 'email': 'user2@example.com', 'password': 'password'})
     assert reg_res.status_code == 201 # Ensure user2 registered
-    
+
     login_res = client.post('/auth/login', json={'email': 'user2@example.com', 'password': 'password'})
     assert login_res.status_code == 200 # client is now authenticated as user2
 
     response_user2 = client.put(f'/comments/{comment.id}', json={'text': 'User2 trying to edit'})
-    assert response_user2.status_code == 403 
+    assert response_user2.status_code == 403
     assert response_user2.json['error'] == 'You are not authorized to edit this comment'
 
 def test_delete_own_comment(auth_client, create_comment_direct):
     comment = create_comment_direct()
     comment_id = comment.id
-    
+
     response = auth_client.delete(f'/comments/{comment_id}')
     assert response.status_code == 200 # Or 204 if no body
     assert response.json['message'] == 'Comment deleted successfully'
@@ -85,7 +85,7 @@ def test_delete_other_users_comment(client, auth_client, create_comment_direct, 
     # Register and login user2
     reg_res = client.post('/auth/register', json={'username': 'user2del', 'email': 'user2del@example.com', 'password': 'password'})
     assert reg_res.status_code == 201
-    
+
     login_res = client.post('/auth/login', json={'email': 'user2del@example.com', 'password': 'password'})
     assert login_res.status_code == 200 # client is now user2del
 

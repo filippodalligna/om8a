@@ -5,7 +5,7 @@ from werkzeug.utils import secure_filename
 from flask_login import login_required, current_user
 from flask_babel import gettext as _ # Added
 from app import db
-from app.models.models import ClimbingBlock, User, Tag, Comment 
+from app.models.models import ClimbingBlock, User, Tag, Comment
 from app.services.badge_service import award_badge, BADGE_FIRST_COMMENT, BADGE_BLOCK_UPLOADER
 from app.services.notification_service import send_notification, NOTIFICATION_TYPE_NEW_BLOCK_BY_FOLLOWED, NOTIFICATION_TYPE_COMMENT_ON_OWN_BLOCK # Updated import
 
@@ -39,11 +39,11 @@ def create_block():
             unique_prefix = str(uuid.uuid4())
             extension = original_filename.rsplit('.', 1)[1].lower()
             final_filename = f"{unique_prefix}.{extension}"
-            
+
             upload_folder_abs = os.path.join(current_app.instance_path, current_app.config['UPLOAD_FOLDER'])
             try:
                 # The folder creation is already handled in app/__init__.py
-                # os.makedirs(upload_folder_abs, exist_ok=True) 
+                # os.makedirs(upload_folder_abs, exist_ok=True)
                 photo_file.save(os.path.join(upload_folder_abs, final_filename))
             except Exception as e:
                 return jsonify({'message': f'Could not save photo: {str(e)}'}), 500
@@ -62,22 +62,22 @@ def create_block():
 
     block_data = {
         'id': new_block.id,
-        'uuid': new_block.uuid, 
+        'uuid': new_block.uuid,
         'name': new_block.name,
         'difficulty': new_block.difficulty,
         'photo_filename': new_block.photo_filename,
         'photo_url': f'/blocks/uploads/{new_block.photo_filename}' if new_block.photo_filename else None,
         'highlight_data': new_block.highlight_data,
         'uploader_id': new_block.uploader_id,
-        'uploader_username': current_user.username, 
+        'uploader_username': current_user.username,
         'created_at': new_block.created_at.isoformat()
     }
-    
+
     # Award "Route Setter" badge if it's the user's first block with a photo
     if new_block.photo_filename: # Check if photo was actually uploaded
         if ClimbingBlock.query.filter_by(uploader_id=current_user.id).filter(ClimbingBlock.photo_filename.isnot(None)).count() == 1:
             award_badge(current_user.id, BADGE_BLOCK_UPLOADER)
-    
+
     # Notify followers about the new block
     try:
         uploader = current_user # User who uploaded the block
@@ -86,8 +86,8 @@ def create_block():
             if follower.id != uploader.id: # Don't notify self (though not expected in followers)
                 payload = {
                     "title": _("New Block Alert!"),
-                    "body": _("%(uploader_name)s just added a new block: %(block_name)s", 
-                              uploader_name=uploader.username, 
+                    "body": _("%(uploader_name)s just added a new block: %(block_name)s",
+                              uploader_name=uploader.username,
                               block_name=new_block.name),
                     "url": f"/blocks/{new_block.id}" # Example URL
                 }
@@ -95,7 +95,7 @@ def create_block():
     except Exception as e:
         # Log error, but don't let notification failure break the main operation
         print(f"Error trying to send new block notification to followers of user {uploader.id}: {e}")
-            
+
     return jsonify({'message': 'Climbing block created successfully', 'block': block_data}), 201
 
 @bp.route('/', methods=['GET'])
@@ -111,14 +111,14 @@ def get_blocks():
                 # This ensures the block has an associated tag with the given name.
                 # Chaining these acts as an AND condition.
                 query = query.filter(ClimbingBlock.tags.any(Tag.name == tag_name))
-    
+
     # Add other filters here if needed, e.g., difficulty
     # difficulty = request.args.get('difficulty')
     # if difficulty:
     #     query = query.filter(ClimbingBlock.difficulty == difficulty)
 
     blocks = query.order_by(ClimbingBlock.created_at.desc()).all() # Example ordering
-    
+
     blocks_data = []
     for block in blocks:
         block_tags_data = [{'id': tag.id, 'name': tag.name} for tag in block.tags]
@@ -138,9 +138,9 @@ def get_blocks():
 def get_block(block_id):
     block = ClimbingBlock.query.get_or_404(block_id)
     uploader = User.query.get(block.uploader_id) # Assuming User model has a simple query
-    
+
     block_tags_data = [{'id': tag.id, 'name': tag.name} for tag in block.tags]
-    
+
     block_data = {
         'id': block.id,
         'uuid': block.uuid, # Added/Ensured UUID
@@ -181,7 +181,7 @@ def add_tag_to_block(block_id):
 
     if not tag_id and not tag_name:
         return jsonify({'message': _('Missing tag_id or tag_name')}), 400
-    
+
     block = ClimbingBlock.query.get_or_404(block_id)
     # Optional: Check if current_user is authorized to tag this block (e.g., uploader)
     # if block.uploader_id != current_user.id:
@@ -211,7 +211,7 @@ def add_tag_to_block(block_id):
 
     block.tags.append(tag_to_add)
     db.session.commit() # Commit after appending and potentially adding new tag
-    
+
     block_tags_data = [{'id': tag.id, 'name': tag.name} for tag in block.tags]
     return jsonify({'message': _('Tag added to block'), 'tags': block_tags_data}), 200
 
@@ -223,7 +223,7 @@ def remove_tag_from_block(block_id, tag_id):
     # Optional: Check if current_user is authorized (e.g., uploader or admin)
     # if block.uploader_id != current_user.id: # Example authorization check
     #     return jsonify({'message': _('Not authorized to modify this block')}), 403
-        
+
     tag_to_remove = Tag.query.get(tag_id) # No need for _or_404, check existence below
     if not tag_to_remove:
         return jsonify({'message': _('Tag not found')}), 404
@@ -248,7 +248,7 @@ def post_comment_on_block(block_id):
         return jsonify({'error': _('Comment text is required and cannot be empty')}), 400
 
     text = data.get('text').strip()
-    
+
     comment = Comment(
         text=text,
         block_id=block.id, # Use block.id from the fetched block
@@ -289,7 +289,7 @@ def post_comment_on_block(block_id):
                 send_notification(block_owner, payload, NOTIFICATION_TYPE_COMMENT_ON_OWN_BLOCK)
     except Exception as e:
         print(f"Error sending new comment notification for block {block.id}: {e}")
-        
+
     return jsonify({'message': _('Comment posted successfully'), 'comment': serialized_comment}), 201
 
 @bp.route('/<int:block_id>/comments', methods=['GET'])
@@ -303,7 +303,7 @@ def get_comments_for_block(block_id):
     comments_pagination = Comment.query.filter_by(block_id=block.id)\
                                    .order_by(Comment.created_at.desc())\
                                    .paginate(page=page, per_page=per_page, error_out=False)
-    
+
     comments_data = []
     for c in comments_pagination.items:
         # author = User.query.get(c.user_id) # Fetch author for username, or use backref
@@ -314,7 +314,7 @@ def get_comments_for_block(block_id):
             'author_username': c.author.username, # Accessing via backref
             'user_id': c.user_id # Include user_id for frontend logic if needed
         })
-    
+
     return jsonify({
         'comments': comments_data,
         'total_comments': comments_pagination.total,
@@ -336,17 +336,17 @@ def get_block_by_qr_uuid(uuid_string):
 
     # Query by the string representation of the UUID
     block = ClimbingBlock.query.filter_by(uuid=uuid_string).first() # Use .first() and check if None
-    
+
     if not block:
         return jsonify({'error': _('Block not found with this QR code UUID')}), 404
 
     # Serialize block data (similar to get_block(block_id))
     uploader = User.query.get(block.uploader_id)
     block_tags_data = [{'id': tag.id, 'name': tag.name} for tag in block.tags]
-    
+
     # Consider if comments should be included or be a separate sub-resource call
     # For now, let's keep it similar to get_block without comments for brevity in this response
-    
+
     block_data = {
         'id': block.id,
         'uuid': block.uuid,

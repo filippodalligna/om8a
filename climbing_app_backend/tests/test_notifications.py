@@ -1,12 +1,12 @@
 # tests/test_notifications.py
 import pytest
 import json
-from unittest.mock import patch, call 
+from unittest.mock import patch, call
 from flask import current_app # Added
 from app.models.models import PushSubscription, User, db, Comment, UserAttempt, ClimbingBlock, Badge, UserBadge # Added Badge, UserBadge
 from app.services.badge_service import award_badge, _ensure_badge_exists, BADGE_FIRST_COMMENT, BADGE_BLOCK_UPLOADER, BADGE_FIRST_COMPLETED_CLIMB, PREDEFINED_BADGES # Added PREDEFINED_BADGES
 from app.services.notification_service import ( # Added notification type constants
-    send_notification, 
+    send_notification,
     NOTIFICATION_TYPE_BADGE_EARNED,
     NOTIFICATION_TYPE_NEW_BLOCK_BY_FOLLOWED,
     NOTIFICATION_TYPE_COMMENT_ON_OWN_BLOCK
@@ -59,7 +59,7 @@ def test_subscribe_push_notifications_missing_endpoint_in_payload(auth_client):
     invalid_subscription = SAMPLE_SUBSCRIPTION_1.copy()
     del invalid_subscription['endpoint']
     response = auth_client.post('/notifications/subscribe', json=invalid_subscription)
-    assert response.status_code == 400 
+    assert response.status_code == 400
     assert 'Invalid subscription data. Endpoint is required.' in response.json['error']
 
 def test_subscribe_push_notifications_empty_payload(auth_client):
@@ -92,7 +92,7 @@ def test_unsubscribe_push_notifications_missing_endpoint(auth_client):
     response = auth_client.post('/notifications/unsubscribe', json={}) # Empty payload
     assert response.status_code == 400
     assert 'Subscription endpoint is required' in response.json['error']
-    
+
 def test_unsubscribe_others_subscription(auth_client, client, user1_fixture, app):
     # user1_fixture (auth_client) subscribes
     auth_client.post('/notifications/subscribe', json=SAMPLE_SUBSCRIPTION_1)
@@ -103,14 +103,14 @@ def test_unsubscribe_others_subscription(auth_client, client, user1_fixture, app
     # Use helpers from conftest
     reg_response = create_test_user(client, user2_username, user2_email)
     assert reg_response.status_code == 201
-    
+
     login_response = login_test_user(client, user2_email)
     assert login_response.status_code == 200 # client is now user2
 
     response = client.post('/notifications/unsubscribe', json={'endpoint': SAMPLE_SUBSCRIPTION_1['endpoint']})
     assert response.status_code == 404 # Not found for this user (user2)
     assert 'Subscription not found' in response.json['error']
-    
+
     # Ensure user1's subscription is still there
     with app.app_context():
         subs = PushSubscription.query.filter_by(user_id=user1_fixture.id).all()
@@ -136,7 +136,7 @@ def test_send_notification_on_badge_earned(mock_webpush, auth_client, user1_fixt
     block_res = auth_client.post('/blocks/', data={'name': 'NotifyBlockBadge', 'difficulty': 'V0'})
     assert block_res.status_code == 201, f"Block creation failed: {block_res.json}"
     block_id = block_res.json['block']['id']
-    
+
     # Post the comment that should trigger the badge
     # Ensure this is the first comment for this user in this session to guarantee badge award
     with app.app_context():
@@ -150,13 +150,13 @@ def test_send_notification_on_badge_earned(mock_webpush, auth_client, user1_fixt
     # 3. Assert mock_webpush was called
     assert mock_webpush.called, "webpush was not called"
     assert mock_webpush.call_count == 1 # Assuming one subscription, one badge
-    
+
     args, kwargs = mock_webpush.call_args
     assert kwargs['subscription_info']['endpoint'] == SAMPLE_SUBSCRIPTION_1['endpoint']
     payload_sent = json.loads(kwargs['data'])
     assert "New Badge Earned!" in payload_sent['title']
     # The name comes from PREDEFINED_BADGES in badge_service.py
-    from app.services.badge_service import PREDEFINED_BADGES 
+    from app.services.badge_service import PREDEFINED_BADGES
     assert PREDEFINED_BADGES[BADGE_FIRST_COMMENT]["name"] in payload_sent['body']
 
 
@@ -168,7 +168,7 @@ def test_send_notification_to_followers_on_new_block(mock_webpush, auth_client, 
     # 1. Create user2 and make them subscribe to notifications
     user2_username = 'follower_for_notif'
     user2_email = 'follower_notif@example.com'
-    
+
     # Ensure user2 is clean for this test
     with app.app_context():
         existing_user2 = User.query.filter_by(email=user2_email).first()
@@ -184,7 +184,7 @@ def test_send_notification_to_followers_on_new_block(mock_webpush, auth_client, 
     assert reg_res.status_code == 201, f"Failed to register user2: {reg_res.json}"
     login_res = login_test_user(client, user2_email) # client is now user2
     assert login_res.status_code == 200, f"Failed to login user2: {login_res.json}"
-    
+
     with app.app_context():
         user2 = User.query.filter_by(email=user2_email).first()
         assert user2 is not None, "User2 was not created or found"
@@ -239,7 +239,7 @@ def test_notification_expired_subscription_deletion(mock_webpush, auth_client, u
     with app.app_context():
         _ensure_badge_exists(BADGE_FIRST_COMMENT) # Ensure badge definition exists
         # award_badge will attempt to send notification
-        award_badge(user1_fixture.id, BADGE_FIRST_COMMENT) 
+        award_badge(user1_fixture.id, BADGE_FIRST_COMMENT)
 
     # Assert that the subscription was deleted
     with app.app_context():
@@ -258,7 +258,7 @@ def set_user_notification_preference(app, user_id, pref_key, value):
 @patch('app.services.notification_service.webpush')
 def test_notification_preference_badge_earned(mock_webpush, auth_client, user1_fixture, app, create_block):
     # Ensure user has a push subscription
-    with app.app_context(): 
+    with app.app_context():
         PushSubscription.query.filter_by(user_id=user1_fixture.id).delete()
         ps = PushSubscription(user_id=user1_fixture.id, subscription_json=json.dumps(SAMPLE_SUBSCRIPTION_1))
         db.session.add(ps)
@@ -267,7 +267,7 @@ def test_notification_preference_badge_earned(mock_webpush, auth_client, user1_f
     # Test Case 1: Preference is True (default) - Should send
     set_user_notification_preference(app, user1_fixture.id, 'notify_on_badge_earned', True)
     # Trigger badge award (e.g., first comment)
-    block_json = create_block(name="Badge Pref Block True") 
+    block_json = create_block(name="Badge Pref Block True")
     # Ensure this is the first comment for this user in this session to guarantee badge award
     with app.app_context():
         Comment.query.filter_by(user_id=user1_fixture.id).delete()
@@ -276,7 +276,7 @@ def test_notification_preference_badge_earned(mock_webpush, auth_client, user1_f
             UserBadge.query.filter_by(user_id=user1_fixture.id, badge_id=badge_to_check.id).delete()
         db.session.commit()
     auth_client.post(f'/blocks/{block_json["id"]}/comments', json={'text': 'Comment for badge pref test (pref true)'})
-    mock_webpush.assert_called() 
+    mock_webpush.assert_called()
     mock_webpush.reset_mock()
 
     # Test Case 2: Preference is False - Should NOT send
@@ -289,7 +289,7 @@ def test_notification_preference_badge_earned(mock_webpush, auth_client, user1_f
         # Ensure no completed attempts exist to guarantee badge award
         UserAttempt.query.filter_by(user_id=user1_fixture.id, status='completed').delete()
         db.session.commit()
-    
+
     block_json_2 = create_block(name="Badge Pref Block False")
     auth_client.post('/history/attempts', json={'block_id': block_json_2['id'], 'status': 'completed'})
     mock_webpush.assert_not_called()
@@ -311,7 +311,7 @@ def test_notification_preference_new_block_by_followed(mock_webpush, auth_client
         if not user1.followers.filter(User.id == user2.id).count() > 0: # Check if user2 is a follower of user1
              user2.followed.append(user1) # If not, user2 follows user1
         db.session.commit()
-       
+
     login_test_user(client, user2_details_fixture['email']) # client is now user2
 
     # Test Case 1: Follower's preference is True - Should send
@@ -321,9 +321,9 @@ def test_notification_preference_new_block_by_followed(mock_webpush, auth_client
     created_block_id = create_block_response.json['block']['id']
 
     mock_webpush.assert_called_with(
-        subscription_info=SAMPLE_SUBSCRIPTION_2, 
+        subscription_info=SAMPLE_SUBSCRIPTION_2,
         data=json.dumps({
-            "title": "New Block Alert!", 
+            "title": "New Block Alert!",
             "body": f"{user1_fixture.username} just added a new block: Notify Follower Block True",
             "url": f"/blocks/{created_block_id}"
         }),
@@ -357,7 +357,7 @@ def test_notification_preference_comment_on_own_block(mock_webpush, auth_client,
     set_user_notification_preference(app, user1_fixture.id, 'notify_on_comment_on_own_block', True)
     comment_text = "A comment from user2 on user1's block (pref true)"
     client.post(f'/blocks/{block_json["id"]}/comments', json={'text': comment_text})
-    
+
     expected_payload = {
         "title": "New Comment on Your Block",
         "body": f"{user2_details_fixture['username']} commented on your block '{block_json['name']}': {comment_text[:50] + '...' if len(comment_text) > 50 else comment_text}",
@@ -388,7 +388,7 @@ def test_comment_on_own_block_no_notification_to_self(mock_webpush, auth_client,
         db.session.add(ps_user1)
         db.session.commit()
     set_user_notification_preference(app, user1_fixture.id, 'notify_on_comment_on_own_block', True)
-    
+
     # user1 posts a comment on their own block
     auth_client.post(f'/blocks/{block_json["id"]}/comments', json={'text': "User1 commenting own block"})
     mock_webpush.assert_not_called() # Should not notify self for own comment

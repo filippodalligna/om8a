@@ -35,7 +35,7 @@ def get_leaderboard():
         query = query.filter(UserAttempt.recorded_at >= start_date)
     elif period != 'all_time':
         return jsonify({'message': "Invalid period. Use 'weekly', 'monthly', or 'all_time'."}), 400
-    
+
     # Apply difficulty filter
     # This join is only added if a difficulty filter is present.
     if difficulty:

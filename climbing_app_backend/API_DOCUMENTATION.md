@@ -118,7 +118,7 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
 
 ### **POST `/blocks/`**
 
--   **Description:** Create a new climbing block. Requires authentication. 
+-   **Description:** Create a new climbing block. Requires authentication.
     - Successfully creating a new block with a photo may result in awarding the 'Route Setter' badge to the uploader if it's their first block uploaded with a photo (potentially triggering a badge earned notification).
     - Additionally, if the uploader has followers who are subscribed to notifications, they may receive a push notification about this new block.
 -   **Request:** `multipart/form-data`
@@ -141,14 +141,14 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
         "message": "Climbing block created successfully",
         "block": {
             "id": 1,
-            "uuid": "a1b2c3d4-e5f6-7890-1234-567890abcdef", 
+            "uuid": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
             "name": "My Awesome Block",
             "difficulty": "V5",
             "photo_filename": "unique_id.jpg",
             "photo_url": "/blocks/uploads/unique_id.jpg",
             "highlight_data": "{\"holds\":[{\"x\":10,\"y\":20,\"color\":\"red\"}]}",
             "uploader_id": 123,
-            "uploader_username": "newclimber", 
+            "uploader_username": "newclimber",
             "created_at": "2024-05-30T12:00:00.000000"
         }
     }
@@ -185,7 +185,7 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
             "photo_url": "/blocks/uploads/unique_id.jpg",
             "uploader_id": 123,
             "created_at": "2024-05-30T12:00:00.000000",
-            "tags": [{"id": 1, "name": "overhang"}] 
+            "tags": [{"id": 1, "name": "overhang"}]
         },
         {
             "id": 2,
@@ -229,7 +229,7 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
     -   **404 Not Found:**
         ```json
         {
-            "message": "Climbing block not found" 
+            "message": "Climbing block not found"
         }
         ```
         *(Note: Actual 404 response might be default Werkzeug HTML page unless customized)*
@@ -250,7 +250,7 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
 -   **Example Request (by ID):**
     ```json
     {
-        "tag_id": 1 
+        "tag_id": 1
     }
     ```
 -   **Example Request (by Name):**
@@ -264,8 +264,8 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
     {
         "message": "Tag added to block",
         "tags": [
-            {"id": 1, "name": "overhang"}, 
-            {"id": 2, "name": "crimp"} 
+            {"id": 1, "name": "overhang"},
+            {"id": 2, "name": "crimp"}
         ]
     }
     ```
@@ -279,7 +279,7 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
         ```
     -   **404 Not Found (Block not found / Tag not found by ID):**
         ```json
-        { "message": "Climbing block not found" } 
+        { "message": "Climbing block not found" }
         ```
         ```json
         { "message": "Tag not found by id" }
@@ -315,7 +315,7 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
 
 ### **POST `/blocks/<int:block_id>/comments`**
 
--   **Description:** Add a new comment to a specific climbing block. Requires authentication. 
+-   **Description:** Add a new comment to a specific climbing block. Requires authentication.
     - Successfully posting a comment may result in awarding the 'Commentator' badge if it's the user's first comment (potentially triggering a badge earned notification).
 -   **Request Body:** JSON
     -   `text` (String, required, not empty): The content of the comment.
@@ -335,7 +335,7 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
             "created_at": "YYYY-MM-DDTHH:MM:SS.ffffffZ",
             "author_username": "testuser",
             "block_id": 123,
-            "user_id": 1 
+            "user_id": 1
         }
     }
     ```
@@ -346,7 +346,7 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
         ```
     -   **404 Not Found (Block not found):**
         ```json
-        { "error": "Climbing block not found" } 
+        { "error": "Climbing block not found" }
         ```
     -   **401 Unauthorized (Not logged in).**
 
@@ -392,7 +392,7 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
 ### **GET `/blocks/qr/<uuid_string>`**
 
 -   **Description:** Get details of a specific climbing block by its UUID. Useful for QR code scans.
--   **Path Parameter:** 
+-   **Path Parameter:**
     -   `uuid_string` (String, required): The UUID (v4) of the block.
 -   **Request Body:** None
 -   **Success Response (200 OK):**
@@ -418,14 +418,14 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
         ```
     -   **404 Not Found (Block not found):**
         ```json
-        { "error": "Block not found with this QR code UUID" } 
+        { "error": "Block not found with this QR code UUID" }
         ```
 
 ## 4. User History (`/history`)
 
 ### **POST `/history/attempts`**
 
--   **Description:** Record an attempt on a climbing block. Requires authentication. 
+-   **Description:** Record an attempt on a climbing block. Requires authentication.
     - Successfully recording a 'completed' attempt may result in awarding badges such as 'First Summit' (for the user's first completed climb), 'V3 Master' (for completing 3 unique V3 climbs), or 'Weekly Sender' (for completing 3 unique climbs in the last 7 days), if criteria are met. This may also trigger push notifications for earned badges.
 -   **Request Body:** JSON
     -   `block_id` (Integer, required): ID of the climbing block.
@@ -565,24 +565,24 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
         "message": "Tag created successfully",
         "tag": {
             "id": 1,
-            "name": "overhang" 
+            "name": "overhang"
         }
     }
     ```
 -   **Error Responses:**
     -   **400 Bad Request (Missing/Empty name):**
         ```json
-        { "message": "Tag name is required" } 
+        { "message": "Tag name is required" }
         ```
         ```json
         { "message": "Tag name cannot be empty" }
         ```
     -   **409 Conflict (Tag already exists):**
         ```json
-        { 
+        {
             "message": "Tag already exists",
             "tag": {
-                "id": 1, 
+                "id": 1,
                 "name": "overhang"
             }
         }
@@ -627,7 +627,7 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
             "created_at": "YYYY-MM-DDTHH:MM:SS.ffffffZ",
             "author_username": "testuser",
             "block_id": 123,
-            "user_id": 1 
+            "user_id": 1
         }
     }
     ```
@@ -680,7 +680,7 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
 -   **Success Response (200 OK):**
     ```json
     {
-      "message": "You are now following <username>." 
+      "message": "You are now following <username>."
     }
     ```
     *(Note: `<username>` will be the actual username of the user being followed.)*
@@ -694,7 +694,7 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
         ```
     -   **404 Not Found (User to follow not found):**
         ```json
-        { "error": "User not found" } 
+        { "error": "User not found" }
         ```
     -   **401 Unauthorized (Not logged in).**
 
@@ -768,6 +768,38 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
         { "error": "User not found" }
         ```
 
+### **`GET /users/<int:user_id>/stats`**
+
+-   **Description:** Get basic climbing statistics for a specific user. Requires authentication. Users can view their own stats; Admins can view any user's stats.
+-   **Path Parameter:** `user_id` (Integer, required).
+-   **Success Response (200 OK):**
+    ```json
+    {
+      "user_id": 1,
+      "username": "testuser",
+      "total_completed_unique_climbs": 15,
+      "highest_grade_completed": "V5",
+      "completed_grade_distribution": {
+        "V0": 5,
+        "V1": 4,
+        "V2": 3,
+        "V3": 2,
+        "V5": 1
+      }
+    }
+    ```
+    *(Note: `highest_grade_completed` could be "N/A" if no valid climbs, and `completed_grade_distribution` could be empty.)*
+-   **Error Responses:**
+    -   **404 Not Found (User not found):**
+        ```json
+        { "error": "User not found." }
+        ```
+    -   **403 Forbidden (Not authorized):**
+        ```json
+        { "error": "You are not authorized to view these statistics." }
+        ```
+    -   **401 Unauthorized (Not authenticated):** (Standard Flask-Login behavior, e.g., `{"error":"Login required"}`)
+
 ## 8. Badge System (`/badges`)
 
 *(Note: Earning a badge, as a side-effect of certain actions like posting a first comment, completing a first climb, or uploading a first block with a photo, may trigger a push notification to the user if they are subscribed to notifications.)*
@@ -838,8 +870,8 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
 -   **Success Response (201 Created or 200 OK):**
     ```json
     {
-      "message": "Successfully subscribed to push notifications." 
-    } 
+      "message": "Successfully subscribed to push notifications."
+    }
     ```
     or
     ```json
@@ -900,17 +932,17 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
           "name": "Admin View Block 1",
           "difficulty": "V5",
           "photo_filename": "image.jpg",
-          "photo_url": "/blocks/uploads/image.jpg", 
+          "photo_url": "/blocks/uploads/image.jpg",
           "highlight_data": "{\"holds\": []}",
           "uploader_id": 1,
           "uploader_username": "testuser",
           "created_at": "YYYY-MM-DDTHH:MM:SS.ffffffZ",
           "updated_at": "YYYY-MM-DDTHH:MM:SS.ffffffZ",
-          "tags": [{"id": 1, "name": "overhang"}] 
+          "tags": [{"id": 1, "name": "overhang"}]
         }
         // ... more blocks
       ],
-      "total_blocks": 100, 
+      "total_blocks": 100,
       "current_page": 1,
       "total_pages": 5,
       "per_page": 20
@@ -952,6 +984,113 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
     }
     ```
 -   **Error Responses:**
+    -   **403 Forbidden:** `{"error": "Admin access required."}`
+
+### **`PUT /admin/blocks/<int:block_id>`**
+
+-   **Description:** Update details of an existing climbing block. Requires Admin privileges. Photo updates are not supported via this endpoint.
+-   **Path Parameter:** `block_id` (Integer, required).
+-   **Request Body:** JSON object with fields to update. Allowed fields: `name` (String), `difficulty` (String), `highlight_data` (String/JSON). All fields are optional in the request, but at least one valid field should be provided for an update to occur.
+-   **Example Request:**
+    ```json
+    {
+      "name": "Updated Block Name by Admin",
+      "difficulty": "V7",
+      "highlight_data": "{\"holds\": \"new data\"}"
+    }
+    ```
+-   **Success Response (200 OK):**
+    ```json
+    {
+      "message": "Block updated successfully.",
+      "block": {
+        "id": 1,
+        "uuid": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+        "name": "Updated Block Name by Admin",
+        "difficulty": "V7",
+        "photo_filename": "image.jpg",
+        "photo_url": "/blocks/uploads/image.jpg",
+        "highlight_data": "{\"holds\": \"new data\"}",
+        "uploader_id": 1,
+        "uploader_username": "testuser",
+        "created_at": "YYYY-MM-DDTHH:MM:SS.ffffffZ",
+        "updated_at": "YYYY-MM-DDTHH:MM:SS.ffffffZ",
+        "tags": []
+      }
+    }
+    ```
+-   **Error Responses:**
+    -   **400 Bad Request:** `{"error": "Request body cannot be empty."}` or `{"message": "No valid fields provided for update or no changes made."}` or `{"error": "Block name cannot be empty."}` or `{"error": "Block difficulty cannot be empty."}`
+    -   **404 Not Found:** `{"error": "Climbing block not found"}` (or standard 404 response)
+    -   **403 Forbidden:** `{"error": "Admin access required."}`
+    -   **500 Internal Server Error:** `{"error": "Failed to update block."}`
+
+### **`DELETE /admin/blocks/<int:block_id>`**
+
+-   **Description:** Delete an existing climbing block. Requires Admin privileges. This is a hard delete and may affect related records like user attempts or comments depending on database foreign key constraints (e.g., if not set to cascade or set null).
+-   **Path Parameter:** `block_id` (Integer, required).
+-   **Success Response (200 OK or 204 No Content):**
+    ```json
+    {
+      "message": "Block deleted successfully."
+    }
+    ```
+-   **Error Responses:**
+    -   **404 Not Found:** `{"error": "Climbing block not found"}` (or standard 404 response)
+    -   **403 Forbidden:** `{"error": "Admin access required."}`
+    -   **500 Internal Server Error:** `{"error": "Failed to delete block."}` (e.g., due to FK constraint violation)
+
+### **`GET /admin/users`**
+
+-   **Description:** Get a paginated list of all users in the system. Requires Admin privileges.
+-   **Query Parameters (optional):**
+    -   `page` (Integer, default: 1): Page number for pagination.
+    -   `per_page` (Integer, default: 20): Number of users per page.
+-   **Success Response (200 OK):**
+    ```json
+    {
+      "users": [
+        {
+          "id": 1,
+          "username": "admin_user",
+          "email": "admin@example.com",
+          "is_admin": true,
+          "created_at": "YYYY-MM-DDTHH:MM:SS.ffffffZ"
+        },
+        {
+          "id": 2,
+          "username": "regular_user",
+          "email": "user@example.com",
+          "is_admin": false,
+          "created_at": "YYYY-MM-DDTHH:MM:SS.ffffffZ"
+        }
+        // ... more users
+      ],
+      "total_users": 50,
+      "current_page": 1,
+      "total_pages": 3,
+      "per_page": 20
+    }
+    ```
+-   **Error Responses:**
+    -   **403 Forbidden:** `{"error": "Admin access required."}`
+
+### **`GET /admin/users/<int:user_id>`**
+
+-   **Description:** Get details for a specific user by their ID. Requires Admin privileges.
+-   **Path Parameter:** `user_id` (Integer, required).
+-   **Success Response (200 OK):**
+    ```json
+    {
+      "id": 1,
+      "username": "admin_user",
+      "email": "admin@example.com",
+      "is_admin": true,
+      "created_at": "YYYY-MM-DDTHH:MM:SS.ffffffZ"
+    }
+    ```
+-   **Error Responses:**
+    -   **404 Not Found:** `{"error": "User not found"}` (or standard 404 response)
     -   **403 Forbidden:** `{"error": "Admin access required."}`
 
 ## 11. Leaderboard (`/leaderboard`)

@@ -18,7 +18,7 @@ def update_comment(comment_id):
     data = request.get_json()
     if not data:
         return jsonify({'error': _('Request body must be JSON')}), 400
-        
+
     new_text = data.get('text')
     if not new_text or not new_text.strip():
         return jsonify({'error': _('Comment text cannot be empty')}), 400

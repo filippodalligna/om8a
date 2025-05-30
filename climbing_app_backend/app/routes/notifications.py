@@ -18,7 +18,7 @@ def subscribe():
 
     # Check if this exact subscription already exists for the user
     existing_sub = PushSubscription.query.filter_by(
-        user_id=current_user.id, 
+        user_id=current_user.id,
         subscription_json=subscription_json_str
     ).first()
 
@@ -40,7 +40,7 @@ def unsubscribe():
     data = request.json
     if not data or not data.get('endpoint'):
         return jsonify({'error': _('Subscription endpoint is required.')}), 400
-    
+
     endpoint_to_remove = data.get('endpoint')
 
     # Find subscriptions for the current user
@@ -56,7 +56,7 @@ def unsubscribe():
         except json.JSONDecodeError:
             # Handle cases where subscription_json is not valid JSON, though ideally it always should be
             # Log this error or handle as appropriate
-            continue 
+            continue
 
     if sub_to_delete:
         db.session.delete(sub_to_delete)

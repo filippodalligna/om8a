@@ -1,8 +1,8 @@
 # tests/test_blocks.py
 import io
 import uuid # Added for QR tests
-import pytest 
-from app.models.models import Tag, ClimbingBlock, db, Comment 
+import pytest
+from app.models.models import Tag, ClimbingBlock, db, Comment
 
 def test_create_block_without_photo(auth_client):
     response = auth_client.post('/blocks/', data={
@@ -55,7 +55,7 @@ def test_add_tag_to_block_by_id(auth_client):
 
     # 3. Add tag to block
     response = auth_client.post(f'/blocks/{block_id}/tags', json={'tag_id': tag_id})
-    assert response.status_code == 200 
+    assert response.status_code == 200
     assert response.json['message'] == 'Tag added to block'
     assert any(t['id'] == tag_id for t in response.json['tags'])
 
@@ -72,7 +72,7 @@ def test_add_tag_to_block_by_name_existing_tag(auth_client):
     block_res = auth_client.post('/blocks/', data={'name': 'Tagged Block Name 1', 'difficulty': 'V5'})
     assert block_res.status_code == 201
     block_id = block_res.json['block']['id']
-    
+
     tag_res = auth_client.post('/tags/', json={'name': 'Sloper'}) # Ensure tag exists
     assert tag_res.status_code == 201
     # tag_id = tag_res.json['tag']['id'] # Not strictly needed for this test variant
@@ -92,7 +92,7 @@ def test_add_tag_to_block_by_name_new_tag(auth_client):
     assert response.status_code == 200
     assert response.json['message'] == 'Tag added to block'
     assert any(t['name'] == 'jugs' for t in response.json['tags'])
-    
+
     # Verify the tag was created in the DB
     tag = Tag.query.filter_by(name='jugs').first()
     assert tag is not None
@@ -104,18 +104,18 @@ def test_remove_tag_from_block(auth_client):
     block_res = auth_client.post('/blocks/', data={'name': 'UntagMe Block', 'difficulty': 'V7'})
     assert block_res.status_code == 201
     block_id = block_res.json['block']['id']
-    
+
     tag_res = auth_client.post('/tags/', json={'name': 'Pinch'})
     assert tag_res.status_code == 201
     tag_id = tag_res.json['tag']['id']
-    
+
     add_res = auth_client.post(f'/blocks/{block_id}/tags', json={'tag_id': tag_id})
     assert add_res.status_code == 200 # Ensure association was successful
     assert any(t['id'] == tag_id for t in add_res.json['tags'])
 
     # 2. Remove the tag
     response = auth_client.delete(f'/blocks/{block_id}/tags/{tag_id}')
-    assert response.status_code == 200 
+    assert response.status_code == 200
     assert response.json['message'] == 'Tag removed from block'
 
     # Verify removal by checking the tags associated with the block
@@ -127,7 +127,7 @@ def test_remove_tag_from_block(auth_client):
     # assert block_details_res_after.status_code == 200
     # assert 'tags' in block_details_res_after.json
     # assert not any(t['id'] == tag_id for t in block_details_res_after.json.get('tags', []))
-    
+
     # Simpler check: try adding the same tag again, it should not report "already associated"
     reattempt_add_res = auth_client.post(f'/blocks/{block_id}/tags', json={'tag_id': tag_id})
     assert reattempt_add_res.status_code == 200 # Should be able to add it again
@@ -180,7 +180,7 @@ def test_filter_blocks_by_multiple_tags(auth_client, client):
     block_m2_res = auth_client.post('/blocks/', data={'name': 'Block M-CharlieOnly', 'difficulty': 'V2'})
     assert block_m2_res.status_code == 201
     block_m2_id = block_m2_res.json['block']['id']
-    
+
     block_m3_res = auth_client.post('/blocks/', data={'name': 'Block M-NoFilterTags', 'difficulty': 'V2'})
     assert block_m3_res.status_code == 201
     block_m3_id = block_m3_res.json['block']['id']
@@ -192,7 +192,7 @@ def test_filter_blocks_by_multiple_tags(auth_client, client):
     assert add_tag1_m1_res.status_code == 200
     add_tag2_m1_res = auth_client.post(f'/blocks/{block_m1_id}/tags', json={'tag_id': tag_m2_id})
     assert add_tag2_m1_res.status_code == 200
-    
+
     # Block M-CharlieOnly gets only TagMultiCharlie
     add_tag1_m2_res = auth_client.post(f'/blocks/{block_m2_id}/tags', json={'tag_id': tag_m1_id})
     assert add_tag1_m2_res.status_code == 200
@@ -215,7 +215,7 @@ def test_filter_blocks_by_tag_no_matches(auth_client, client):
     # Create a tag that won't be associated with any blocks in this test
     tag_res = auth_client.post('/tags/', json={'name': 'UnusedFilterTag'})
     assert tag_res.status_code == 201
-    
+
     # Create some blocks without this tag
     auth_client.post('/blocks/', data={'name': 'Block Epsilon', 'difficulty': 'V1'})
     auth_client.post('/blocks/', data={'name': 'Block Zeta', 'difficulty': 'V1'})
@@ -230,13 +230,13 @@ def test_filter_blocks_by_tag_no_matches(auth_client, client):
 def test_post_comment_on_block(auth_client, create_block):
     block_json = create_block() # Uses the fixture from conftest.py
     block_id = block_json['id']
-    
+
     response = auth_client.post(f'/blocks/{block_id}/comments', json={'text': 'This is a test comment!'})
     assert response.status_code == 201
     assert response.json['comment']['text'] == 'This is a test comment!'
     assert response.json['comment']['block_id'] == block_id
     # Assuming 'defaultuser' is the one logged in by auth_client
-    assert response.json['comment']['author_username'] == 'defaultuser' 
+    assert response.json['comment']['author_username'] == 'defaultuser'
 
 def test_post_comment_empty_text_on_block(auth_client, create_block):
     block_json = create_block()
@@ -265,13 +265,13 @@ def test_get_comments_for_block(auth_client, client, create_block):
     assert response.json['total_comments'] == 2
     assert len(response.json['comments']) == 2
     # Comments are ordered by newest first (descending created_at)
-    assert response.json['comments'][0]['text'] == 'Comment 2' 
+    assert response.json['comments'][0]['text'] == 'Comment 2'
     assert response.json['comments'][1]['text'] == 'Comment 1'
 
 def test_get_comments_for_block_pagination(auth_client, client, create_block):
     block_json = create_block()
     block_id = block_json['id']
-    
+
     # Create 3 comments
     auth_client.post(f'/blocks/{block_id}/comments', json={'text': 'Page Comment 1'}) # Oldest
     auth_client.post(f'/blocks/{block_id}/comments', json={'text': 'Page Comment 2'})
@@ -304,7 +304,7 @@ def test_get_block_by_qr_uuid_valid(auth_client, create_block):
     created_block_json = create_block(name='QR Block Test UUID', difficulty='V0')
     assert 'uuid' in created_block_json, "UUID missing from create_block response"
     block_uuid = created_block_json['uuid']
-    
+
     response = auth_client.get(f'/blocks/qr/{block_uuid}')
     assert response.status_code == 200
     assert response.json['id'] == created_block_json['id']
@@ -317,7 +317,7 @@ def test_get_block_by_qr_uuid_invalid_format(auth_client):
     assert response.status_code == 400
     # Assuming error message key is 'Invalid UUID format' and it's translated
     # My API returns {'error': _('Invalid UUID format')}
-    assert 'Invalid UUID format' in response.json['error'] 
+    assert 'Invalid UUID format' in response.json['error']
 
 def test_get_block_by_qr_uuid_non_existent(auth_client):
     non_existent_uuid = str(uuid.uuid4()) # Generate a valid but non-existent UUID

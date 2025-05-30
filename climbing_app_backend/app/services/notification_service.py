@@ -34,7 +34,7 @@ def send_notification(user, payload_dict, notification_type_key): # New signatur
     active_subscriptions = [sub for sub in user.push_subscriptions] # Evaluate the dynamic query
     if not active_subscriptions:
         print(f"No active push subscriptions found for user {user.id}.")
-        return 
+        return
 
     vapid_private_key = current_app.config.get('VAPID_PRIVATE_KEY')
     vapid_claims = current_app.config.get('VAPID_CLAIMS')
@@ -62,7 +62,7 @@ def send_notification(user, payload_dict, notification_type_key): # New signatur
                 subscription_info=subscription_info,
                 data=payload_json,
                 vapid_private_key=vapid_private_key,
-                vapid_claims=claims_to_use 
+                vapid_claims=claims_to_use
             )
             print(f"Sent push notification to user {user.id}, endpoint: {subscription_info.get('endpoint')}")
         except WebPushException as ex:

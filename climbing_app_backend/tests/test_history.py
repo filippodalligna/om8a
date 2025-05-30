@@ -23,7 +23,7 @@ def test_get_my_history(auth_client):
     assert block_res.status_code == 201
     block_id = block_res.json['block']['id']
     auth_client.post('/history/attempts', json={'block_id': block_id, 'status': 'tried'})
-    
+
     response = auth_client.get('/history/me')
     assert response.status_code == 200
     assert isinstance(response.json, list)
