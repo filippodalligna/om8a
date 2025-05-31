@@ -1,5 +1,4 @@
-import uuid # Added
-import uuid # Added
+import uuid
 from datetime import datetime
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -29,7 +28,8 @@ class User(db.Model, UserMixin):
     notify_on_comment_on_own_block = db.Column(db.Boolean, nullable=False, default=True)
     notify_on_badge_earned = db.Column(db.Boolean, nullable=False, default=True)
     notify_on_new_block_by_followed = db.Column(db.Boolean, nullable=False, default=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow) # Added
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    is_active = db.Column(db.Boolean, nullable=False, default=True) # server_default=sa.true() will be in migration
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -53,6 +53,8 @@ block_tags = db.Table('block_tags',
     db.Column('tag_id', db.Integer, db.ForeignKey('tag.id'), primary_key=True)
 )
 
+ALLOWED_BLOCK_STATUSES = ['active', 'hidden_by_admin', 'needs_repair']
+
 class Tag(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), unique=True, nullable=False) # Tag names are unique
@@ -62,6 +64,7 @@ class Tag(db.Model):
 
 class ClimbingBlock(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    status = db.Column(db.String(50), nullable=False, default='active', server_default='active')
     uuid = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()), index=True) # Added
     name = db.Column(db.String(100), nullable=False)
     difficulty = db.Column(db.String(50), nullable=False)
@@ -126,30 +129,6 @@ class UserBadge(db.Model):
     def __repr__(self):
         return f'<UserBadge User {self.user_id} earned Badge {self.badge_id} at {self.earned_at}>'
 
-class Badge(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
-    description = db.Column(db.Text, nullable=True)
-    icon_url = db.Column(db.String(255), nullable=True)
-    criteria = db.Column(db.Text, nullable=True) # Textual or JSON criteria
-
-    def __repr__(self):
-        return f'<Badge {self.name}>'
-
-class UserBadge(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    badge_id = db.Column(db.Integer, db.ForeignKey('badge.id'), nullable=False)
-    earned_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-
-    user = db.relationship('User', backref=db.backref('earned_badges_assoc', lazy='dynamic'))
-    badge = db.relationship('Badge', backref=db.backref('earned_by_users_assoc', lazy='dynamic'))
-
-    __table_args__ = (db.UniqueConstraint('user_id', 'badge_id', name='uq_user_badge'),)
-
-    def __repr__(self):
-        return f'<UserBadge User {self.user_id} earned Badge {self.badge_id} at {self.earned_at}>'
-
 class PushSubscription(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -160,3 +139,25 @@ class PushSubscription(db.Model):
 
     def __repr__(self):
         return f'<PushSubscription {self.id} for User {self.user_id}>'
+
+ALLOWED_PROPOSAL_STATUSES = ['pending', 'approved', 'rejected']
+
+class BlockProposal(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    proposer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    location_description = db.Column(db.Text, nullable=False)
+    climb_description = db.Column(db.Text, nullable=True)
+    proposed_grade = db.Column(db.String(50), nullable=True)
+    photo_filename_proposal = db.Column(db.String(255), nullable=True) # Changed from 200 to 255 for consistency
+    status = db.Column(db.String(50), nullable=False, default='pending') # e.g., 'pending', 'approved', 'rejected'
+    admin_reviewer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    admin_notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+
+    # Relationships
+    proposer = db.relationship('User', foreign_keys=[proposer_id], backref=db.backref('block_proposals', lazy='dynamic'))
+    admin_reviewer = db.relationship('User', foreign_keys=[admin_reviewer_id]) # No backref needed from User to all proposals they reviewed, or can be simple
+
+    def __repr__(self):
+        return f'<BlockProposal {self.id} by User {self.proposer_id} - Status: {self.status}>'

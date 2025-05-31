@@ -100,7 +100,8 @@ def create_block():
 
 @bp.route('/', methods=['GET'])
 def get_blocks():
-    query = ClimbingBlock.query
+    # Start with only 'active' blocks for public view
+    query = ClimbingBlock.query.filter_by(status='active')
 
     # Tag filtering
     tags_str = request.args.get('tags')
@@ -130,13 +131,20 @@ def get_blocks():
             'photo_url': f'/blocks/uploads/{block.photo_filename}' if block.photo_filename else None,
             'uploader_id': block.uploader_id,
             'created_at': block.created_at.isoformat(),
-            'tags': block_tags_data
+            'tags': block_tags_data,
+            'status': block.status # Added status
         })
     return jsonify(blocks_data), 200
 
 @bp.route('/<int:block_id>', methods=['GET'])
 def get_block(block_id):
     block = ClimbingBlock.query.get_or_404(block_id)
+
+    # Check block status for non-admin users
+    if block.status != 'active':
+        if not current_user.is_authenticated or not hasattr(current_user, 'is_admin') or not current_user.is_admin:
+            return jsonify({'error': _('Block not found or not available.')}), 404
+
     uploader = User.query.get(block.uploader_id) # Assuming User model has a simple query
 
     block_tags_data = [{'id': tag.id, 'name': tag.name} for tag in block.tags]
@@ -152,7 +160,8 @@ def get_block(block_id):
         'uploader_id': block.uploader_id,
         'uploader_username': uploader.username if uploader else 'Unknown',
         'created_at': block.created_at.isoformat(),
-        'tags': block_tags_data
+        'tags': block_tags_data,
+        'status': block.status # Added status
     }
     return jsonify(block_data), 200
 
@@ -347,6 +356,12 @@ def get_block_by_qr_uuid(uuid_string):
     # Consider if comments should be included or be a separate sub-resource call
     # For now, let's keep it similar to get_block without comments for brevity in this response
 
+    # Check block status for non-admin users (also for QR code route)
+    if block.status != 'active':
+        if not current_user.is_authenticated or not hasattr(current_user, 'is_admin') or not current_user.is_admin:
+            # Using hasattr for is_admin in case current_user is AnonymousUserMixin which doesn't have it.
+            return jsonify({'error': _('Block not found or not available.')}), 404
+
     block_data = {
         'id': block.id,
         'uuid': block.uuid,
@@ -357,7 +372,8 @@ def get_block_by_qr_uuid(uuid_string):
         'uploader_id': block.uploader_id,
         'uploader_username': uploader.username if uploader else 'Unknown',
         'created_at': block.created_at.isoformat(),
-        'tags': block_tags_data
+        'tags': block_tags_data,
+        'status': block.status # Added status
         # Comments could be paginated and fetched via /blocks/<id>/comments
     }
     return jsonify(block_data), 200

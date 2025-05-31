@@ -144,6 +144,7 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
             "uuid": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
             "name": "My Awesome Block",
             "difficulty": "V5",
+            "status": "active",
             "photo_filename": "unique_id.jpg",
             "photo_url": "/blocks/uploads/unique_id.jpg",
             "highlight_data": "{\"holds\":[{\"x\":10,\"y\":20,\"color\":\"red\"}]}",
@@ -170,7 +171,7 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
 
 ### **GET `/blocks/`**
 
--   **Description:** Get a list of all climbing blocks. Can be filtered by tags.
+-   **Description:** Get a list of all climbing blocks. Can be filtered by tags. By default, only blocks with status 'active' are returned.
 -   **Query Parameters (optional):**
     -   `tags` (String): Comma-separated list of tag names. Blocks returned will be associated with ALL specified tags (e.g., `?tags=overhang,crimp`). Tag names are case-insensitive.
 -   **Request Body:** None
@@ -182,6 +183,7 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
             "uuid": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
             "name": "My Awesome Block",
             "difficulty": "V5",
+            "status": "active",
             "photo_url": "/blocks/uploads/unique_id.jpg",
             "uploader_id": 123,
             "created_at": "2024-05-30T12:00:00.000000",
@@ -192,6 +194,7 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
             "uuid": "b2c3d4e5-f6g7-8901-2345-67890abcdef1",
             "name": "Another Block",
             "difficulty": "V3",
+            "status": "active",
             "photo_url": null,
             "uploader_id": 124,
             "created_at": "2024-05-30T12:05:00.000000",
@@ -204,7 +207,7 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
 
 ### **GET `/blocks/<int:block_id>`**
 
--   **Description:** Get details of a specific climbing block.
+-   **Description:** Get details of a specific climbing block. If a block's status is not 'active', this endpoint will return a 404 error for non-admin users. Admins can view blocks regardless of their status via this endpoint.
 -   **Request Body:** None
 -   **Success Response (200 OK):**
     ```json
@@ -213,6 +216,7 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
         "uuid": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
         "name": "My Awesome Block",
         "difficulty": "V5",
+        "status": "active",
         "photo_filename": "unique_id.jpg",
         "photo_url": "/blocks/uploads/unique_id.jpg",
         "highlight_data": "{\"holds\":[{\"x\":10,\"y\":20,\"color\":\"red\"}]}",
@@ -228,11 +232,13 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
 -   **Error Responses:**
     -   **404 Not Found:**
         ```json
-        {
-            "message": "Climbing block not found"
-        }
+        { "message": "Climbing block not found" }
         ```
-        *(Note: Actual 404 response might be default Werkzeug HTML page unless customized)*
+        or for non-admins on non-active blocks:
+        ```json
+        { "error": "Block not found or not available." }
+        ```
+        *(Note: Actual 404 response might be default Werkzeug HTML page unless customized for the first case)*
 
 ### **GET `/blocks/uploads/<filename>`**
 
@@ -391,7 +397,7 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
 
 ### **GET `/blocks/qr/<uuid_string>`**
 
--   **Description:** Get details of a specific climbing block by its UUID. Useful for QR code scans.
+-   **Description:** Get details of a specific climbing block by its UUID. Useful for QR code scans. If a block's status is not 'active', this endpoint will return a 404 error for non-admin users. Admins can view blocks regardless of their status via this endpoint.
 -   **Path Parameter:**
     -   `uuid_string` (String, required): The UUID (v4) of the block.
 -   **Request Body:** None
@@ -402,6 +408,7 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
         "uuid": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
         "name": "Block Name from QR",
         "difficulty": "V5",
+        "status": "active",
         "photo_filename": "unique_id.jpg",
         "photo_url": "/blocks/uploads/unique_id.jpg",
         "highlight_data": "{\"holds\":[]}",
@@ -416,9 +423,13 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
         ```json
         { "error": "Invalid UUID format" }
         ```
-    -   **404 Not Found (Block not found):**
+    -   **404 Not Found (Block not found / Not available to user):**
         ```json
         { "error": "Block not found with this QR code UUID" }
+        ```
+        or for non-admins on non-active blocks:
+        ```json
+        { "error": "Block not found or not available." }
         ```
 
 ## 4. User History (`/history`)
@@ -768,38 +779,6 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
         { "error": "User not found" }
         ```
 
-### **`GET /users/<int:user_id>/stats`**
-
--   **Description:** Get basic climbing statistics for a specific user. Requires authentication. Users can view their own stats; Admins can view any user's stats.
--   **Path Parameter:** `user_id` (Integer, required).
--   **Success Response (200 OK):**
-    ```json
-    {
-      "user_id": 1,
-      "username": "testuser",
-      "total_completed_unique_climbs": 15,
-      "highest_grade_completed": "V5",
-      "completed_grade_distribution": {
-        "V0": 5,
-        "V1": 4,
-        "V2": 3,
-        "V3": 2,
-        "V5": 1
-      }
-    }
-    ```
-    *(Note: `highest_grade_completed` could be "N/A" if no valid climbs, and `completed_grade_distribution` could be empty.)*
--   **Error Responses:**
-    -   **404 Not Found (User not found):**
-        ```json
-        { "error": "User not found." }
-        ```
-    -   **403 Forbidden (Not authorized):**
-        ```json
-        { "error": "You are not authorized to view these statistics." }
-        ```
-    -   **401 Unauthorized (Not authenticated):** (Standard Flask-Login behavior, e.g., `{"error":"Login required"}`)
-
 ## 8. Badge System (`/badges`)
 
 *(Note: Earning a badge, as a side-effect of certain actions like posting a first comment, completing a first climb, or uploading a first block with a photo, may trigger a push notification to the user if they are subscribed to notifications.)*
@@ -931,6 +910,7 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
           "uuid": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
           "name": "Admin View Block 1",
           "difficulty": "V5",
+          "status": "active",
           "photo_filename": "image.jpg",
           "photo_url": "/blocks/uploads/image.jpg",
           "highlight_data": "{\"holds\": []}",
@@ -966,6 +946,7 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
           "uuid": "b2c3d4e5-f6g7-8901-2345-67890abcdef1",
           "name": "Block Missing Photo",
           "difficulty": "V3",
+          "status": "active",
           "photo_filename": null,
           "photo_url": null,
           "highlight_data": null,
@@ -1008,6 +989,7 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
         "uuid": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
         "name": "Updated Block Name by Admin",
         "difficulty": "V7",
+        "status": "active",
         "photo_filename": "image.jpg",
         "photo_url": "/blocks/uploads/image.jpg",
         "highlight_data": "{\"holds\": \"new data\"}",
@@ -1024,6 +1006,44 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
     -   **404 Not Found:** `{"error": "Climbing block not found"}` (or standard 404 response)
     -   **403 Forbidden:** `{"error": "Admin access required."}`
     -   **500 Internal Server Error:** `{"error": "Failed to update block."}`
+
+### **`PUT /admin/blocks/<int:block_id>/status`**
+
+-   **Description:** Update the status of a specific climbing block. Requires Admin privileges. Allowed statuses are 'active', 'hidden_by_admin', 'needs_repair'.
+-   **Path Parameter:** `block_id` (Integer, required).
+-   **Request Body:** JSON object.
+    ```json
+    {
+      "status": "hidden_by_admin"
+    }
+    ```
+-   **Success Response (200 OK):**
+    ```json
+    {
+      "message": "Block status updated successfully.",
+      "block": {
+        "id": 1,
+        "uuid": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+        "name": "Block Name",
+        "difficulty": "V5",
+        "status": "hidden_by_admin",
+        "photo_filename": "image.jpg",
+        "photo_url": "/blocks/uploads/image.jpg",
+        "highlight_data": "{\"holds\": []}",
+        "uploader_id": 1,
+        "uploader_username": "testuser",
+        "created_at": "YYYY-MM-DDTHH:MM:SS.ffffffZ",
+        "updated_at": "YYYY-MM-DDTHH:MM:SS.ffffffZ",
+        "tags": [{"id": 1, "name": "overhang"}]
+      }
+    }
+    ```
+-   **Error Responses:**
+    -   **400 Bad Request (Status field issues):** `{"error": "Status field is required in the request body."}` or `{"error": "Status field cannot be empty."}`
+    -   **400 Bad Request (Invalid status value):** `{"error": "Invalid status value. Allowed values are: active, hidden_by_admin, needs_repair"}`
+    -   **404 Not Found:** `{"error": "Climbing block not found"}` (or standard 404 response)
+    -   **403 Forbidden:** `{"error": "Admin access required."}`
+    -   **500 Internal Server Error:** `{"error": "Failed to update block status."}`
 
 ### **`DELETE /admin/blocks/<int:block_id>`**
 
@@ -1093,6 +1113,39 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
     -   **404 Not Found:** `{"error": "User not found"}` (or standard 404 response)
     -   **403 Forbidden:** `{"error": "Admin access required."}`
 
+### **`PUT /admin/users/<int:user_id>/status`**
+
+-   **Description:** Update the status (admin privileges and active status) of a specific user. Requires Admin privileges. Admins cannot demote or deactivate their own accounts via this endpoint.
+-   **Path Parameter:** `user_id` (Integer, required): The ID of the user whose status is to be updated.
+-   **Request Body:** JSON object. Both `is_admin` and `is_active` are optional in the request, but at least one should be provided for an update to occur.
+    ```json
+    {
+      "is_admin": true,
+      "is_active": false
+    }
+    ```
+-   **Success Response (200 OK):**
+    ```json
+    {
+      "message": "User status updated successfully.",
+      "user": {
+        "id": 2,
+        "username": "someuser",
+        "is_admin": true,
+        "is_active": false,
+        "created_at": "YYYY-MM-DDTHH:MM:SS.ffffffZ"
+      }
+    }
+    ```
+-   **Error Responses:**
+    -   **400 Bad Request (Empty body):** `{"error": "Request body cannot be empty."}`
+    -   **400 Bad Request (No valid fields/No change):** `{"message": "No valid fields provided for update or no changes made."}`
+    -   **400 Bad Request (Self-demotion):** `{"error": "Admins cannot remove their own admin status."}`
+    -   **400 Bad Request (Self-deactivation):** `{"error": "Admins cannot deactivate their own account."}`
+    -   **404 Not Found (User not found):** `{"error": "User not found"}` (or standard 404 response)
+    -   **403 Forbidden:** `{"error": "Admin access required."}`
+    -   **500 Internal Server Error (DB error):** `{"error": "Failed to update user status."}`
+
 ## 11. Leaderboard (`/leaderboard`)
 
 ### **GET `/leaderboard/`**
@@ -1129,3 +1182,5 @@ The base URL for all API endpoints is assumed to be `http://localhost:5000` or t
             "message": "Invalid period. Use 'weekly', 'monthly', or 'all_time'."
         }
         ```
+
+[end of climbing_app_backend/API_DOCUMENTATION.md]

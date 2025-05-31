@@ -10,6 +10,7 @@ class Config:
                                      # For instance folder, it's usually app.instance_path
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     UPLOAD_FOLDER = 'uploads' # Will be joined with app.instance_path
+    PROPOSAL_UPLOAD_FOLDER = 'proposal_uploads' # Will be joined with app.instance_path
 
     # VAPID keys for Push Notifications (Worker: Using placeholders)
     VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY') or "YOUR_GENERATED_PRIVATE_KEY_PLACEHOLDER"

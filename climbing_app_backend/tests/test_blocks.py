@@ -325,3 +325,83 @@ def test_get_block_by_qr_uuid_non_existent(auth_client):
     assert response.status_code == 404
     # My API returns {'error': _('Block not found with this QR code UUID')}
     assert 'Block not found with this QR code UUID' in response.json['error']
+
+# --- Tests for Block Status affecting public endpoints ---
+from app.models.models import ALLOWED_BLOCK_STATUSES # For reference, not direct use in most tests here
+
+def test_public_list_blocks_only_shows_active(client, create_block_db, admin_client, app):
+    active_block = create_block_db(name="Public Active Block", difficulty="V0", status='active')
+    hidden_block = create_block_db(name="Public Hidden Block", difficulty="V0", status='active') # Initially active
+
+    # Admin hides one block
+    update_res = admin_client.put(f'/admin/blocks/{hidden_block.id}/status', json={'status': 'hidden_by_admin'})
+    assert update_res.status_code == 200 # Ensure admin action was successful
+
+    response = client.get('/blocks/')
+    assert response.status_code == 200
+    block_names = [b['name'] for b in response.json]
+    assert active_block.name in block_names
+    assert hidden_block.name not in block_names
+    # Also check that the status field is present and 'active' for listed blocks
+    for b_json in response.json:
+        if b_json['name'] == active_block.name:
+            assert b_json['status'] == 'active'
+
+
+def test_public_get_specific_block_active(client, create_block_db):
+    active_block = create_block_db(name="Specific Active Block", difficulty="V0", status='active')
+    response = client.get(f'/blocks/{active_block.id}')
+    assert response.status_code == 200
+    assert response.json['name'] == active_block.name
+    assert response.json['status'] == 'active'
+
+def test_public_get_specific_block_hidden_returns_404(client, create_block_db, admin_client):
+    # Create block (default active or explicitly active)
+    hidden_block = create_block_db(name="Specific Hidden Block", difficulty="V0", status='active')
+    # Admin hides the block
+    update_res = admin_client.put(f'/admin/blocks/{hidden_block.id}/status', json={'status': 'hidden_by_admin'})
+    assert update_res.status_code == 200
+
+    response = client.get(f'/blocks/{hidden_block.id}')
+    assert response.status_code == 404
+    assert 'Block not found or not available' in response.json['error']
+
+def test_admin_can_get_specific_block_hidden(admin_client, create_block_db):
+    hidden_block = create_block_db(name="Specific Hidden For Admin", difficulty="V0", status='active')
+    # Admin hides the block
+    update_res = admin_client.put(f'/admin/blocks/{hidden_block.id}/status', json={'status': 'hidden_by_admin'})
+    assert update_res.status_code == 200
+
+    response = admin_client.get(f'/blocks/{hidden_block.id}') # Admin uses the public endpoint
+    assert response.status_code == 200
+    assert response.json['name'] == hidden_block.name
+    assert response.json['status'] == 'hidden_by_admin'
+
+def test_public_get_block_by_qr_active(client, create_block_db):
+    active_block = create_block_db(name="QR Active Block", difficulty="V0", status='active')
+    response = client.get(f'/blocks/qr/{active_block.uuid}')
+    assert response.status_code == 200
+    assert response.json['name'] == active_block.name
+    assert response.json['status'] == 'active'
+
+def test_public_get_block_by_qr_hidden_returns_404(client, create_block_db, admin_client):
+    hidden_block = create_block_db(name="QR Hidden Block", difficulty="V0", status='active')
+    # Admin hides the block
+    update_res = admin_client.put(f'/admin/blocks/{hidden_block.id}/status', json={'status': 'hidden_by_admin'})
+    assert update_res.status_code == 200
+
+    response = client.get(f'/blocks/qr/{hidden_block.uuid}')
+    assert response.status_code == 404
+    assert 'Block not found or not available' in response.json['error']
+
+
+def test_admin_can_get_block_by_qr_hidden(admin_client, create_block_db):
+    hidden_block = create_block_db(name="QR Hidden For Admin", difficulty="V0", status='active')
+    # Admin hides the block
+    update_res = admin_client.put(f'/admin/blocks/{hidden_block.id}/status', json={'status': 'hidden_by_admin'})
+    assert update_res.status_code == 200
+
+    response = admin_client.get(f'/blocks/qr/{hidden_block.uuid}') # Admin uses public QR endpoint
+    assert response.status_code == 200
+    assert response.json['name'] == hidden_block.name
+    assert response.json['status'] == 'hidden_by_admin'

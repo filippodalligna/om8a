@@ -54,6 +54,15 @@ def create_app(config_class=Config, config_overrides=None):
         print(f"Error creating upload folder: {e}")
         pass
 
+    # Ensure the proposal upload folder exists in the instance path
+    proposal_upload_folder_config = app.config.get('PROPOSAL_UPLOAD_FOLDER', 'proposal_uploads') # Default if not in config
+    proposal_upload_folder_path = os.path.join(app.instance_path, proposal_upload_folder_config)
+    try:
+        os.makedirs(proposal_upload_folder_path, exist_ok=True)
+    except OSError as e:
+        app.logger.error(f"Error creating proposal upload folder: {e}") # Use app.logger
+        pass
+
 
     from app.routes.auth import bp as auth_bp
     app.register_blueprint(auth_bp, url_prefix='/auth')
@@ -84,5 +93,8 @@ def create_app(config_class=Config, config_overrides=None):
 
     from app.routes.admin import admin_bp # Added
     app.register_blueprint(admin_bp) # url_prefix is defined in the blueprint itself (/admin)
+
+    from app.routes.proposals import proposals_bp # Added proposals_bp
+    app.register_blueprint(proposals_bp) # url_prefix is /proposals (defined in proposals.py)
 
     return app
